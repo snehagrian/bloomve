@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "BloomVe Share",
+  "version": "0.1.0",
+  "description": "Share the current job page to BloomVe.",
+  "permissions": ["activeTab", "tabs", "storage"],
+  "action": {
+    "default_title": "BloomVe Share",
+    "default_popup": "popup.html"
+  }
+}
