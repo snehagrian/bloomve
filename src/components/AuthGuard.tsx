@@ -29,8 +29,11 @@ export default function AuthGuard({ children }: AuthGuardProps) {
 
   if (loading) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center text-sm text-slate-500">
-        Loading your workspace...
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-rose-200 border-t-rose-500"></div>
+          <p className="text-sm text-slate-400">Loading your workspace...</p>
+        </div>
       </div>
     );
   }

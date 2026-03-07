@@ -37,28 +37,35 @@ export default function CreateRoomForm({ onCreateRoom }: CreateRoomFormProps) {
   };
 
   return (
-    <form onSubmit={onSubmit} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="text-lg font-semibold text-slate-900">Create a room</h2>
-      <p className="mt-1 text-sm text-slate-500">Set room type and privacy, then start sharing jobs.</p>
-
-      <div className="mt-4 space-y-4">
+    <form onSubmit={onSubmit} className="card p-6">
+      <div className="mb-5 flex items-center gap-2.5">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-rose-100 to-pink-100 text-base">
+          ✨
+        </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">Room name</label>
+          <h2 className="font-bold text-slate-900">Create a room</h2>
+          <p className="text-xs text-slate-400">Set type and privacy, then start sharing.</p>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <div>
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500">Room name</label>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Frontend referrals"
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-indigo-500 focus:ring"
+            placeholder="e.g. Frontend referrals"
+            className="input-field"
           />
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Type</label>
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500">Type</label>
             <select
               value={type}
               onChange={(e) => setType(e.target.value as RoomType)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-indigo-500 focus:ring"
+              className="input-field"
             >
               <option value="chat">Chat (two-way)</option>
               <option value="channel">Channel (one-way)</option>
@@ -66,11 +73,11 @@ export default function CreateRoomForm({ onCreateRoom }: CreateRoomFormProps) {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Privacy</label>
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500">Privacy</label>
             <select
               value={privacy}
               onChange={(e) => setPrivacy(e.target.value as RoomPrivacy)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-indigo-500 focus:ring"
+              className="input-field"
             >
               <option value="public">Public</option>
               <option value="private">Private</option>
@@ -79,13 +86,13 @@ export default function CreateRoomForm({ onCreateRoom }: CreateRoomFormProps) {
         </div>
       </div>
 
-      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+      {error && (
+        <div className="mt-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-500">
+          {error}
+        </div>
+      )}
 
-      <button
-        type="submit"
-        disabled={loading}
-        className="mt-5 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-60"
-      >
+      <button type="submit" disabled={loading} className="btn-primary mt-5">
         {loading ? "Creating..." : "Create room"}
       </button>
     </form>

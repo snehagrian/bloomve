@@ -48,52 +48,60 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-      <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold text-slate-900">Log in to BloomVe</h1>
-        <p className="mt-1 text-sm text-slate-500">Welcome back. Continue sharing opportunities.</p>
+    <main className="mesh-bg flex min-h-screen items-center justify-center px-4 py-12">
+      <div className="card w-full max-w-md p-8 sm:p-10">
+        {/* Logo */}
+        <div className="mb-8 text-center">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-rose-400 to-fuchsia-500 shadow-lg shadow-rose-200">
+            <span className="text-xl">🌸</span>
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Welcome back</h1>
+          <p className="mt-1.5 text-sm text-slate-400">Log in to continue sharing opportunities.</p>
+        </div>
 
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Email</label>
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500">Email</label>
             <input
               type="email"
               required
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-indigo-500 focus:ring"
+              placeholder="you@example.com"
+              className="input-field"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Password</label>
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500">Password</label>
             <input
               type="password"
               required
               minLength={6}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-indigo-500 focus:ring"
+              placeholder="Your password"
+              className="input-field"
             />
           </div>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && (
+            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-500">
+              {error}
+            </div>
+          )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-60"
-          >
-            {loading ? "Logging in..." : "Log in"}
+          <button type="submit" disabled={loading} className="btn-primary w-full">
+            {loading ? "Logging in..." : "Log in →"}
           </button>
         </form>
 
-        <p className="mt-5 text-sm text-slate-600">
+        <div className="mt-6 text-center text-sm text-slate-400">
           New here?{" "}
-          <Link href="/signup" className="font-medium text-indigo-600 hover:text-indigo-500">
+          <Link href="/signup" className="font-semibold text-rose-500 hover:text-rose-600">
             Create an account
           </Link>
-        </p>
+        </div>
       </div>
     </main>
   );

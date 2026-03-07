@@ -60,34 +60,39 @@ export default function RoomPage() {
 
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-slate-50">
+      <div className="mesh-bg min-h-screen">
         <Navbar userEmail={user?.email} />
 
-        <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
-          <Link href="/dashboard" className="text-sm font-medium text-indigo-600 hover:text-indigo-500">
-            ← Back to dashboard
+        <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+          <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-sm font-semibold text-rose-400 hover:text-rose-500 transition-colors">
+            ← Dashboard
           </Link>
 
           {!room ? (
-            <div className="mt-4 rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500 shadow-sm">
-              Loading room...
+            <div className="card mt-4 p-8 text-center">
+              <div className="mx-auto h-7 w-7 animate-spin rounded-full border-2 border-rose-200 border-t-rose-500"></div>
+              <p className="mt-3 text-sm text-slate-400">Loading room...</p>
             </div>
           ) : (
             <>
-              <section className="mt-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-xl font-semibold text-slate-900">{room.name}</h1>
-                  <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700">
+              {/* Room header */}
+              <section className="card mt-4 p-5">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-rose-100 to-fuchsia-100 text-base">
+                    {room.type === "chat" ? "💬" : "📢"}
+                  </div>
+                  <h1 className="text-xl font-bold text-slate-900">{room.name}</h1>
+                  <span className="rounded-full border border-rose-200/70 bg-rose-50 px-2.5 py-0.5 text-xs font-semibold text-rose-500">
                     {room.type}
                   </span>
-                  <span className="rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
+                  <span className="rounded-full border border-fuchsia-200/70 bg-fuchsia-50 px-2.5 py-0.5 text-xs font-semibold text-fuchsia-500">
                     {room.privacy}
                   </span>
                 </div>
-                <p className="mt-2 text-sm text-slate-500">
+                <p className="mt-2 text-sm text-slate-400">
                   {room.type === "chat"
-                    ? "Chat: everyone in this room can post."
-                    : "Channel: only owner/admin can post."}
+                    ? "Chat room — everyone can post."
+                    : "Channel — only the owner can post."}
                 </p>
               </section>
 
@@ -101,29 +106,31 @@ export default function RoomPage() {
                 </div>
 
                 <section className="space-y-3 lg:col-span-2">
-                  <h2 className="text-lg font-semibold text-slate-900">Room feed</h2>
+                  <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-400">Room feed</h2>
 
                   {posts.length === 0 ? (
-                    <div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500 shadow-sm">
-                      No shared links yet. Add one now.
+                    <div className="card py-14 text-center">
+                      <p className="text-3xl">🌸</p>
+                      <p className="mt-3 font-medium text-slate-400">No posts yet</p>
+                      <p className="mt-1 text-xs text-slate-300">Share a job link to get things started.</p>
                     </div>
                   ) : (
                     posts.map((post) => (
-                      <article key={post.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                        <div className="flex items-center justify-between gap-4">
-                          <h3 className="font-semibold text-slate-900">{post.title || "Shared job link"}</h3>
-                          <span className="text-xs text-slate-500">{prettyDate(post.createdAt?.toMillis())}</span>
+                      <article key={post.id} className="card group p-5 hover:shadow-md hover:shadow-rose-50 transition-all">
+                        <div className="flex items-start justify-between gap-4">
+                          <h3 className="font-semibold text-slate-900 leading-snug">{post.title || "Shared job link"}</h3>
+                          <span className="shrink-0 text-xs text-slate-300">{prettyDate(post.createdAt?.toMillis())}</span>
                         </div>
 
-                        {post.text && <p className="mt-2 text-sm text-slate-700">{post.text}</p>}
+                        {post.text && <p className="mt-2 text-sm leading-relaxed text-slate-500">{post.text}</p>}
 
                         <a
                           href={post.jobUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="mt-3 inline-block text-sm font-medium text-indigo-600 hover:text-indigo-500"
+                          className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-rose-500 hover:text-rose-600 transition-colors"
                         >
-                          Open job posting
+                          View posting <span className="group-hover:translate-x-0.5 transition-transform inline-block">→</span>
                         </a>
                       </article>
                     ))

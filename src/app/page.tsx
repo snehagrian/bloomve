@@ -2,49 +2,68 @@ import Link from "next/link";
 
 export default function Home() {
   return (
-    <main className="flex min-h-screen items-center justify-center px-4 py-16">
-      <section className="w-full max-w-5xl rounded-2xl border border-slate-200 bg-white p-8 shadow-sm sm:p-12">
-        <div className="inline-flex rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-indigo-700">
-          BloomVe
-        </div>
+    <main className="mesh-bg flex min-h-screen items-center justify-center px-4 py-16">
+      <section className="w-full max-w-5xl">
+        {/* Hero Card */}
+        <div className="card p-10 sm:p-16">
+          {/* Badge */}
+          <div className="inline-flex items-center gap-2 rounded-full border border-rose-200/60 bg-gradient-to-r from-rose-50 to-pink-50 px-4 py-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-rose-400"></span>
+            <span className="text-xs font-semibold uppercase tracking-widest text-rose-500">BloomVe</span>
+          </div>
 
-        <h1 className="mt-5 text-4xl font-bold leading-tight text-slate-900 sm:text-5xl">
-          Opportunities bloom via people.
-        </h1>
+          {/* Headline */}
+          <h1 className="mt-7 text-5xl font-bold leading-[1.1] tracking-tight text-slate-900 sm:text-6xl">
+            Opportunities bloom<br />
+            <span className="bg-gradient-to-r from-rose-500 via-pink-500 to-fuchsia-500 bg-clip-text text-transparent">
+              via people.
+            </span>
+          </h1>
 
-        <p className="mt-4 max-w-3xl text-base leading-7 text-slate-600 sm:text-lg">
-          BloomVe is a collaborative job-sharing platform where communities create chat rooms and channels
-          to discover and share opportunities faster.
-        </p>
+          <p className="mt-5 max-w-2xl text-lg leading-relaxed text-slate-400">
+            A collaborative job-sharing platform where communities create rooms and channels
+            to discover and share opportunities — together.
+          </p>
 
-        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-          <Link
-            href="/signup"
-            className="rounded-md bg-indigo-600 px-5 py-2.5 text-center text-sm font-semibold text-white hover:bg-indigo-500"
-          >
-            Sign up
-          </Link>
-          <Link
-            href="/login"
-            className="rounded-md border border-slate-300 bg-white px-5 py-2.5 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50"
-          >
-            Log in
-          </Link>
-        </div>
+          {/* CTAs */}
+          <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+            <Link href="/signup" className="btn-primary text-center">
+              Get started free →
+            </Link>
+            <Link href="/login" className="btn-ghost text-center">
+              Log in
+            </Link>
+          </div>
 
-        <div className="mt-10 grid gap-4 sm:grid-cols-3">
-          <article className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <h2 className="font-semibold text-slate-900">Collaborative Discovery</h2>
-            <p className="mt-1 text-sm text-slate-600">Share openings from LinkedIn, Greenhouse, Lever, and more.</p>
-          </article>
-          <article className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <h2 className="font-semibold text-slate-900">Chat + Channel Modes</h2>
-            <p className="mt-1 text-sm text-slate-600">Choose two-way discussion or one-way updates per room.</p>
-          </article>
-          <article className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <h2 className="font-semibold text-slate-900">Browser Extension</h2>
-            <p className="mt-1 text-sm text-slate-600">Post the active tab URL into BloomVe rooms instantly.</p>
-          </article>
+          {/* Divider */}
+          <div className="my-12 h-px bg-gradient-to-r from-transparent via-pink-200 to-transparent" />
+
+          {/* Feature cards */}
+          <div className="grid gap-5 sm:grid-cols-3">
+            <article className="group rounded-2xl border border-rose-100/80 bg-gradient-to-br from-white to-rose-50/60 p-6 hover:border-rose-200 hover:shadow-md hover:shadow-rose-50 transition-all">
+              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-rose-100 to-pink-100 text-lg">
+                🤝
+              </div>
+              <h2 className="font-semibold text-slate-800">Collaborative Discovery</h2>
+              <p className="mt-2 text-sm leading-relaxed text-slate-400">Share openings from LinkedIn, Greenhouse, Lever, and more with your network.</p>
+            </article>
+
+            <article className="group rounded-2xl border border-fuchsia-100/80 bg-gradient-to-br from-white to-fuchsia-50/60 p-6 hover:border-fuchsia-200 hover:shadow-md hover:shadow-fuchsia-50 transition-all">
+              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-fuchsia-100 to-pink-100 text-lg">
+                💬
+              </div>
+              <h2 className="font-semibold text-slate-800">Chat + Channel Modes</h2>
+              <p className="mt-2 text-sm leading-relaxed text-slate-400">Two-way discussion or one-way broadcast — your room, your rules.</p>
+            </article>
+
+            <article className="group rounded-2xl border border-pink-100/80 bg-gradient-to-br from-white to-pink-50/60 p-6 hover:border-pink-200 hover:shadow-md hover:shadow-pink-50 transition-all">
+              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-pink-100 to-rose-100 text-lg">
+                🔗
+              </div>
+              <h2 className="font-semibold text-slate-800">Browser Extension</h2>
+              <p className="mt-2 text-sm leading-relaxed text-slate-400">Share the active tab to any room in one click — no copy-paste needed.</p>
+            </article>
+          </div>
         </div>
       </section>
     </main>
