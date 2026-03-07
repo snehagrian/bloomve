@@ -4,7 +4,9 @@ BloomVe is a collaborative job-sharing platform (web app + Chrome extension).
 
 ## Tech Stack
 
-- Next.js (App Router) + TypeScript + Tailwind CSS
+- Next.js 16 (App Router) + TypeScript 5 + Tailwind CSS 4
+- React 19
+- Firebase 12 (client SDK) + Firebase Admin 13
 - Firebase Authentication (email/password)
 - Firebase Firestore (with realtime listeners)
 - Chrome Extension (Manifest V3)
@@ -26,7 +28,7 @@ Run these commands from your workspace root:
 ```bash
 npx create-next-app@latest bloomve --typescript --tailwind --eslint --app --src-dir --use-npm --import-alias "@/*"
 cd bloomve
-npm install firebase firebase-admin
+npm install firebase@^12 firebase-admin@^13
 ```
 
 ## 3) Folder Structure
@@ -83,7 +85,13 @@ bloomve/
 
 Create `.env.local` in project root by copying `.env.local.example`.
 
-PowerShell:
+macOS / Linux:
+
+```bash
+cp .env.local.example .env.local
+```
+
+Windows (PowerShell):
 
 ```powershell
 Copy-Item .env.local.example .env.local
