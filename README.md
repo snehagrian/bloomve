@@ -1,195 +1,124 @@
-# BloomVe MVP
+# BloomVe
 
-BloomVe is a collaborative job-sharing platform (web app + Chrome extension).
+**Slogan:** _Opportunities bloom via people._
+
+BloomVe is a collaborative, people-first job-sharing platform with:
+- a Next.js web app
+- a Chrome extension for one-click sharing
+
+---
+
+## Current Product Status
+
+This repo now includes a complete MVP+ flow with:
+- account creation and login
+- strong password policy
+- forgot password by email
+- membership-based room visibility
+- invite links and participant management
+- room-level privacy and member limits
+- profile settings and account actions
+- modern pink “BloomVe” visual system and consistent branding
+
+---
 
 ## Tech Stack
 
-- Next.js 16 (App Router) + TypeScript 5 + Tailwind CSS 4
+- Next.js 16 (App Router) + TypeScript
 - React 19
-- Firebase 12 (client SDK) + Firebase Admin 13
-- Firebase Authentication (email/password)
-- Firebase Firestore (with realtime listeners)
+- Tailwind CSS 4
+- Firebase Auth
+- Firestore (realtime listeners)
+- Firebase Storage (room avatar uploads)
 - Chrome Extension (Manifest V3)
 
-## 1) Prerequisites
+---
 
-Install these first:
+## Core Features
 
-- Node.js 20+
-- npm
-- Google Chrome
-- Firebase account
-- Vercel account (for deployment)
+### 1) Authentication
 
-## 2) Project Initialization Commands
+- Signup fields: **username, email, password, confirm password**
+- Password requirements:
+  - minimum 8 characters
+  - at least one number
+  - at least one special character
+- Duplicate validation:
+  - email already in use → friendly error
+  - username already in use → friendly error
+- Login with email/password
+- Forgot password flow (email reset from login screen)
 
-Run these commands from your workspace root:
+### 2) Room Visibility and Discovery
 
-```bash
-npx create-next-app@latest bloomve --typescript --tailwind --eslint --app --src-dir --use-npm --import-alias "@/*"
-cd bloomve
-npm install firebase@^12 firebase-admin@^13
-```
+- Users only see rooms/channels where they are a member
+- Public channels appear as suggestions if user is not yet a member
+- Private rooms are not shown in suggestions
 
-## 3) Folder Structure
+### 3) Room Creation + Invites
 
-```txt
-bloomve/
-	extension/
-		manifest.json
-		popup.html
-		popup.js
-	src/
-		app/
-			page.tsx
-			login/page.tsx
-			signup/page.tsx
-			dashboard/page.tsx
-			rooms/[roomId]/page.tsx
-			api/share/route.ts
-		components/
-			AuthGuard.tsx
-			Navbar.tsx
-			CreateRoomForm.tsx
-			RoomList.tsx
-			ShareComposer.tsx
-		lib/
-			firebase.ts
-			auth.ts
-			firestore.ts
-	public/
-	firestore.rules
-	.env.local.example
-	package.json
-	README.md
-```
+- Create chat or channel
+- Set room privacy (public/private)
+- Add participants during creation
+- Generate shareable invite link
+- Join room using invite token
 
-## 4) Firebase Setup (Beginner Steps)
+### 4) Room Management (Owner Controls)
 
-1. Go to Firebase Console and create a project named `bloomve`.
-2. In **Build > Authentication**:
-	 - Click **Get started**
-	 - Enable **Email/Password**
-3. In **Build > Firestore Database**:
-	 - Click **Create database**
-	 - Start in production mode (we will add rules)
-4. In **Project settings > General**:
-	 - Create a web app
-	 - Copy Firebase web config values
-5. In **Project settings > Service accounts**:
-	 - Generate new private key
-	 - Use values for admin env variables
-6. In Firestore, create the required index when prompted (for `privacy + createdAt` room query).
+- Rename room
+- Update room avatar (upload/camera)
+- Add participant by username
+- Remove participant
+- Block participant
+- Unblock participant (from settings)
+- Set max users per room
+- Delete room
 
-## 5) Environment Variables
+### 5) Posting Behavior
 
-Create `.env.local` in project root by copying `.env.local.example`.
+- Chat: all members can post
+- Channel: owner-only posting
+- Realtime feed updates
 
-macOS / Linux:
+### 6) User Settings
 
-```bash
-cp .env.local.example .env.local
-```
+- Edit username/email
+- Duplicate checks during update
+- Delete account
+- Logout
+- Help center/contact section
+- Global blocked participants management (owned rooms)
 
-Windows (PowerShell):
+### 7) Branding and UX
 
-```powershell
-Copy-Item .env.local.example .env.local
-```
+- Unified slogan usage: **“Opportunities bloom via people.”**
+- “BloomVe” name emphasized in hero/welcome UI
+- Modern pink glass/3D-inspired theme
+- Symbolic icon set and consistent visual language
+- Username shown in navbar (email moved to settings)
 
-Fill all values in `.env.local`.
+---
 
-## 6) Firestore Rules (MVP)
+## Data Model (Current)
 
-1. Open Firebase Console > Firestore Database > Rules
-2. Paste content from `firestore.rules`
-3. Publish rules
+### `users` collection
 
-## 7) Run Locally
-
-```bash
-npm run dev
-```
-
-Open: `http://localhost:3000`
-
-## 8) MVP User Flow Test (Web)
-
-1. Sign up
-2. Go to dashboard
-3. Create a room (`chat` + `public` is easiest for first test)
-4. Open the room
-5. Share a job link manually in the room page
-6. Confirm post appears in realtime
-
-## 9) Chrome Extension Setup (Local)
-
-1. Open `chrome://extensions`
-2. Enable **Developer mode**
-3. Click **Load unpacked**
-4. Select folder: `bloomve/extension`
-
-In popup, set:
-
-- API base URL: `http://localhost:3000`
-- Temporary shared secret: same as `EXTENSION_SHARED_SECRET`
-- Click `Refresh rooms` and pick a public room
-
-Then:
-
-1. Open any job post page in Chrome
-2. Click BloomVe extension icon
-3. Click `Share to BloomVe`
-4. Check room feed in web app for new post
-
-## 10) API Contract for Extension
-
-### POST `/api/share`
-
-Headers:
-
-- `X-Bloomve-Secret: <EXTENSION_SHARED_SECRET>`
-
-Body:
-
-```json
-{
-	"roomId": "ROOM_ID",
-	"jobUrl": "https://example.com/job/123",
-	"title": "Optional title"
-}
-```
-
-### GET `/api/share`
-
-Used by extension popup to fetch public rooms.
-
-## 11) Vercel Deployment
-
-1. Push code to GitHub
-2. Import repo in Vercel
-3. Add all `.env.local` variables into Vercel project env settings
-4. Deploy
-5. Update extension `API base URL` to production domain
-
-## 12) Security Note (Important)
-
-The extension uses a temporary shared secret in MVP mode. This is **not production-grade auth**.
-
-For production later:
-
-- Replace shared secret with real user auth (Firebase ID tokens / session-based auth)
-- Add membership checks for private rooms
-- Add role-based access for channel posting
-
-## 13) Data Model
+- `uid`
+- `username`
+- `usernameLower`
+- `email`
 
 ### `rooms` collection
 
 - `name`
-- `type` (`chat` or `channel`)
-- `privacy` (`public` or `private`)
+- `type` (`chat` | `channel`)
+- `privacy` (`public` | `private`)
 - `ownerId`
+- `memberIds` (array)
+- `blockedUserIds` (array)
+- `inviteToken`
+- `maxMembers`
+- `avatarUrl`
 - `createdAt`
 
 ### `rooms/{roomId}/posts` subcollection
@@ -201,4 +130,74 @@ For production later:
 - `jobUrl`
 - `createdAt`
 
-Optional next step for future: add `roomMembers` collection for invite/member management.
+---
+
+## Security / Rules
+
+`firestore.rules` has been updated for:
+- membership-aware reads
+- controlled joins and invite behavior
+- owner-scoped admin actions
+- blocked-user restrictions
+- users profile access rules
+- room max-members constraints
+
+After changing rules locally, publish them in Firebase Console.
+
+---
+
+## Local Setup
+
+### Prerequisites
+
+- Node.js 20+
+- npm
+- Firebase project (Auth + Firestore + Storage)
+- Google Chrome (for extension testing)
+
+### Install
+
+```bash
+npm install
+```
+
+### Run app
+
+```bash
+npm run dev
+```
+
+### Lint
+
+```bash
+npm run lint
+```
+
+---
+
+## Chrome Extension (Local)
+
+1. Open `chrome://extensions`
+2. Enable **Developer mode**
+3. Click **Load unpacked**
+4. Select `/extension`
+
+Configure popup with your web app base URL and shared secret, then share current tab into a room.
+
+---
+
+## Known Notes
+
+- ESLint currently reports `@next/next/no-img-element` warnings in room list/room page for image tags.
+- Functionality is working; switching to `next/image` can remove these warnings.
+
+---
+
+## Key Paths
+
+- App shell and routes: `src/app`
+- Auth logic: `src/lib/auth.ts`
+- Firestore + room logic: `src/lib/firestore.ts`
+- Shared UI components: `src/components`
+- Extension files: `extension/`
+- Firestore rules: `firestore.rules`

@@ -5,17 +5,92 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function roomMembers(roomData) {
+      return roomData.keys().hasAny(["memberIds"]) ? roomData.memberIds : [roomData.ownerId];
+    }
+
+    function blockedUsers(roomData) {
+      return roomData.keys().hasAny(["blockedUserIds"]) ? roomData.blockedUserIds : [];
+    }
+
+    function isBlocked(roomData) {
+      return signedIn() && request.auth.uid in blockedUsers(roomData);
+    }
+
+    function isRoomMember(roomData) {
+      return signedIn() && !isBlocked(roomData) && (
+        roomData.ownerId == request.auth.uid
+        || request.auth.uid in roomMembers(roomData)
+      );
+    }
+
+    function canReadRoom(roomData) {
+      return (roomData.privacy == "public" && (!signedIn() || !isBlocked(roomData))) || isRoomMember(roomData);
+    }
+
+    function roomMaxMembers(roomData) {
+      return roomData.keys().hasAny(["maxMembers"]) ? roomData.maxMembers : 500;
+    }
+
+    function hasValidMaxMembers(roomData) {
+      return !roomData.keys().hasAny(["maxMembers"])
+        || (
+          roomData.maxMembers is int
+          && roomData.maxMembers >= 1
+          && roomData.maxMembers <= 500
+        );
+    }
+
+    function fitsMemberLimit(roomData) {
+      return roomMembers(roomData).size() <= roomMaxMembers(roomData);
+    }
+
+    function isSelfAppendMemberOnly() {
+      return request.resource.data.memberIds.hasAll(roomMembers(resource.data))
+        && request.resource.data.memberIds.size() == roomMembers(resource.data).size() + 1
+        && request.auth.uid in request.resource.data.memberIds
+        && !(request.auth.uid in roomMembers(resource.data));
+    }
+
     match /rooms/{roomId} {
-      allow read: if resource.data.privacy == "public" || (signedIn() && resource.data.ownerId == request.auth.uid);
-      allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
-      allow update, delete: if signedIn() && resource.data.ownerId == request.auth.uid;
+      allow read: if canReadRoom(resource.data);
+
+      allow create: if signedIn()
+                    && request.resource.data.ownerId == request.auth.uid
+                    && request.auth.uid in request.resource.data.memberIds
+                    && hasValidMaxMembers(request.resource.data)
+                    && fitsMemberLimit(request.resource.data);
+
+      allow update, delete: if signedIn() && (
+        (
+          resource.data.ownerId == request.auth.uid
+          && hasValidMaxMembers(request.resource.data)
+          && fitsMemberLimit(request.resource.data)
+        )
+        || (
+          resource.data.privacy == "public"
+          && resource.data.type == "channel"
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["memberIds"])
+          && isSelfAppendMemberOnly()
+          && hasValidMaxMembers(request.resource.data)
+          && fitsMemberLimit(request.resource.data)
+        )
+        || (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(["memberIds", "inviteToken"])
+          && isSelfAppendMemberOnly()
+          && !isBlocked(resource.data)
+          && request.resource.data.inviteToken == resource.data.inviteToken
+          && hasValidMaxMembers(request.resource.data)
+          && fitsMemberLimit(request.resource.data)
+        )
+      );
 
       match /posts/{postId} {
-        allow read: if get(/databases/$(database)/documents/rooms/$(roomId)).data.privacy == "public"
-                    || (signedIn() && get(/databases/$(database)/documents/rooms/$(roomId)).data.ownerId == request.auth.uid);
+        allow read: if canReadRoom(get(/databases/$(database)/documents/rooms/$(roomId)).data);
 
         allow create: if signedIn()
                       && request.resource.data.userId == request.auth.uid
+                      && canReadRoom(get(/databases/$(database)/documents/rooms/$(roomId)).data)
                       && (
                         get(/databases/$(database)/documents/rooms/$(roomId)).data.type == "chat"
                         || get(/databases/$(database)/documents/rooms/$(roomId)).data.ownerId == request.auth.uid
@@ -23,6 +98,12 @@ service cloud.firestore {
 
         allow update, delete: if signedIn() && resource.data.userId == request.auth.uid;
       }
+    }
+
+    match /users/{userId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() && request.auth.uid == userId;
+      allow delete: if signedIn() && request.auth.uid == userId;
     }
   }
 }

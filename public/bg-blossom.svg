@@ -1,0 +1,26 @@
+<svg width="520" height="520" viewBox="0 0 520 520" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="520" height="520" fill="#FFF8FC"/>
+  <g opacity="0.22">
+    <circle cx="78" cy="72" r="3" fill="#F472B6"/>
+    <circle cx="154" cy="128" r="2.4" fill="#FB7185"/>
+    <circle cx="242" cy="64" r="2.8" fill="#D946EF"/>
+    <circle cx="336" cy="116" r="2.6" fill="#F472B6"/>
+    <circle cx="420" cy="70" r="2.2" fill="#FB7185"/>
+    <circle cx="472" cy="154" r="3" fill="#D946EF"/>
+    <circle cx="88" cy="228" r="2.5" fill="#FB7185"/>
+    <circle cx="188" cy="194" r="2.9" fill="#F472B6"/>
+    <circle cx="296" cy="230" r="2.3" fill="#D946EF"/>
+    <circle cx="396" cy="210" r="2.7" fill="#FB7185"/>
+    <circle cx="458" cy="286" r="2.4" fill="#F472B6"/>
+    <circle cx="66" cy="322" r="2.6" fill="#D946EF"/>
+    <circle cx="150" cy="306" r="2.2" fill="#F472B6"/>
+    <circle cx="256" cy="338" r="3" fill="#FB7185"/>
+    <circle cx="356" cy="316" r="2.3" fill="#D946EF"/>
+    <circle cx="430" cy="364" r="2.8" fill="#F472B6"/>
+    <circle cx="92" cy="430" r="2.4" fill="#FB7185"/>
+    <circle cx="176" cy="446" r="2.7" fill="#D946EF"/>
+    <circle cx="270" cy="430" r="2.2" fill="#F472B6"/>
+    <circle cx="366" cy="454" r="2.9" fill="#FB7185"/>
+    <circle cx="452" cy="420" r="2.3" fill="#D946EF"/>
+  </g>
+</svg>

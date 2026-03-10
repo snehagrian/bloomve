@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { FirebaseError } from "firebase/app";
-import { loginWithEmail } from "@/lib/auth";
+import { loginWithEmail, sendPasswordReset } from "@/lib/auth";
 
 function getAuthErrorMessage(error: unknown) {
   const firebaseError = error as FirebaseError | undefined;
@@ -22,14 +22,22 @@ function getAuthErrorMessage(error: unknown) {
     return "Firebase API key is invalid. Recheck NEXT_PUBLIC_FIREBASE_API_KEY in .env.local.";
   }
 
+  if (code.includes("auth/too-many-requests")) {
+    return "Too many attempts. Please wait and try again.";
+  }
+
   return "Could not log in. Please verify Firebase Auth settings and try again.";
 }
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextUrl = searchParams.get("next") || "/dashboard";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetMessage, setResetMessage] = useState("");
   const [error, setError] = useState("");
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -39,11 +47,31 @@ export default function LoginPage() {
 
     try {
       await loginWithEmail(email.trim(), password);
-      router.push("/dashboard");
+      router.push(nextUrl);
     } catch (error) {
       setError(getAuthErrorMessage(error));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    setError("");
+    setResetMessage("");
+
+    if (!email.trim()) {
+      setError("Enter your email first, then click Forgot password.");
+      return;
+    }
+
+    setResetLoading(true);
+    try {
+      await sendPasswordReset(email.trim());
+      setResetMessage("Password reset email sent. Check your inbox.");
+    } catch (resetError) {
+      setError(getAuthErrorMessage(resetError));
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -53,10 +81,15 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-rose-400 to-fuchsia-500 shadow-lg shadow-rose-200">
-            <span className="text-xl">🌸</span>
+            <span className="text-sm font-bold tracking-wider text-white">✿</span>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Welcome back</h1>
-          <p className="mt-1.5 text-sm text-slate-400">Log in to continue sharing opportunities.</p>
+          <p className="mt-1.5 text-sm text-slate-400">Opportunities bloom via people.</p>
+          <p className="mt-2 text-3xl font-extrabold tracking-tight text-slate-900">
+            <span className="bg-gradient-to-r from-rose-500 via-pink-500 to-fuchsia-500 bg-clip-text text-transparent">
+              BloomVe
+            </span>
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -77,17 +110,31 @@ export default function LoginPage() {
             <input
               type="password"
               required
-              minLength={6}
+              minLength={8}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               placeholder="Your password"
               className="input-field"
             />
+            <button
+              type="button"
+              onClick={handleForgotPassword}
+              disabled={resetLoading}
+              className="mt-2 text-xs font-semibold text-rose-500 hover:text-rose-600"
+            >
+              {resetLoading ? "Sending reset email..." : "Forgot password?"}
+            </button>
           </div>
 
           {error && (
             <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-500">
               {error}
+            </div>
+          )}
+
+          {resetMessage && (
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+              {resetMessage}
             </div>
           )}
 

@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #fdf2f8;
-  --foreground: #18111a;
+  --background: #fff8fc;
+  --foreground: #1f2937;
 }
 
 @theme inline {
@@ -18,6 +18,168 @@ body {
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+  position: relative;
+  cursor: default;
+  caret-color: transparent;
+}
+
+html,
+body,
+body * {
+  cursor: default;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background:
+    linear-gradient(180deg, rgba(255, 244, 248, 0.28) 0%, rgba(255, 247, 250, 0.48) 46%, rgba(255, 255, 255, 0.8) 100%),
+    url("/bg-bold-stage.svg");
+  background-size: cover, cover;
+  background-position: center, center;
+  background-repeat: no-repeat, no-repeat;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(ellipse 52% 40% at 50% 18%, rgba(255, 255, 255, 0.26) 0%, transparent 64%),
+    radial-gradient(ellipse 58% 48% at 50% 96%, rgba(255, 255, 255, 0.14) 0%, transparent 62%);
+  pointer-events: none;
+}
+
+@keyframes float-drift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(0, -18px, 0) scale(1.04);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes glow-pulse {
+  0% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.62;
+  }
+  100% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes beam-shift {
+  0% {
+    transform: translateX(-18%) rotate(10deg);
+  }
+  100% {
+    transform: translateX(18%) rotate(10deg);
+  }
+}
+
+.fx-stage {
+  position: relative;
+  isolation: isolate;
+}
+
+.fx-stage::before,
+.fx-stage::after {
+  content: "";
+  position: fixed;
+  z-index: -1;
+  border-radius: 9999px;
+  pointer-events: none;
+  filter: blur(2px);
+}
+
+.fx-stage::before {
+  width: 360px;
+  height: 360px;
+  top: 10%;
+  left: -120px;
+  background: radial-gradient(circle at 35% 35%, rgba(251, 113, 133, 0.52), rgba(244, 114, 182, 0.15) 52%, rgba(255, 255, 255, 0) 70%);
+  animation: float-drift 7.5s ease-in-out infinite;
+}
+
+.fx-stage::after {
+  width: 440px;
+  height: 440px;
+  right: -140px;
+  bottom: -50px;
+  background: radial-gradient(circle at 40% 35%, rgba(217, 70, 239, 0.35), rgba(244, 114, 182, 0.15) 54%, rgba(255, 255, 255, 0) 72%);
+  animation: float-drift 9s ease-in-out infinite reverse;
+}
+
+.hero-3d {
+  position: relative;
+  overflow: hidden;
+}
+
+.hero-3d::before {
+  content: "";
+  position: absolute;
+  top: -120px;
+  left: -20%;
+  width: 140%;
+  height: 190px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.52), rgba(255, 255, 255, 0));
+  transform: rotate(10deg);
+  animation: beam-shift 5.5s linear infinite alternate;
+  pointer-events: none;
+}
+
+.card-3d {
+  transform-style: preserve-3d;
+  transition: transform 240ms ease, box-shadow 240ms ease, border-color 240ms ease;
+}
+
+.card-3d:hover {
+  transform: translateY(-4px) rotateX(4deg) rotateY(-4deg);
+  box-shadow: 0 12px 34px rgba(244, 63, 94, 0.16), 0 8px 18px rgba(15, 23, 42, 0.08);
+}
+
+.glass-panel {
+  background: linear-gradient(140deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.58));
+  border: 1px solid rgba(251, 113, 133, 0.24);
+  border-radius: 1.1rem;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.icon-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 0.8rem;
+  background: linear-gradient(150deg, rgba(255, 228, 239, 0.96), rgba(251, 207, 232, 0.9));
+  border: 1px solid rgba(244, 114, 182, 0.42);
+  box-shadow: inset 0 1px 0 rgba(255, 240, 247, 0.8), 0 8px 18px rgba(244, 63, 94, 0.16);
+}
+
+.soft-glow {
+  position: relative;
+}
+
+.soft-glow::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border-radius: inherit;
+  background: radial-gradient(circle at 45% 35%, rgba(251, 113, 133, 0.35), rgba(244, 114, 182, 0.05) 55%, rgba(255, 255, 255, 0) 70%);
+  z-index: -1;
+  animation: glow-pulse 4.6s ease-in-out infinite;
 }
 
 /* Mesh background orbs */
@@ -32,7 +194,7 @@ body {
   background:
     radial-gradient(ellipse 80% 60% at 20% 10%, rgba(244,114,182,0.18) 0%, transparent 60%),
     radial-gradient(ellipse 60% 50% at 80% 80%, rgba(217,70,239,0.12) 0%, transparent 55%),
-    radial-gradient(ellipse 50% 40% at 60% 30%, rgba(251,207,232,0.20) 0%, transparent 50%);
+    radial-gradient(ellipse 50% 40% at 60% 30%, rgba(251,207,232,0.22) 0%, transparent 50%);
   pointer-events: none;
   z-index: 0;
 }
@@ -43,17 +205,70 @@ body {
 
 /* Elegant card base */
 .card {
-  background: rgba(255,255,255,0.85);
+  background: rgba(255,255,255,0.9);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(244,114,182,0.18);
+  border: 1px solid rgba(244,114,182,0.22);
   border-radius: 1.25rem;
-  box-shadow: 0 1px 3px rgba(244,63,94,0.05), 0 8px 24px rgba(244,63,94,0.06);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05), 0 10px 28px rgba(244,63,94,0.08);
 }
 
 /* Smooth all interactive elements */
 a, button, input, select, textarea {
   transition: all 0.18s ease;
+}
+
+a,
+a *,
+button,
+[role="button"],
+button *,
+[role="button"] * {
+  cursor: pointer;
+}
+
+a,
+a * {
+  cursor: pointer !important;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+span,
+li,
+dt,
+dd,
+small,
+strong,
+em {
+  cursor: default;
+}
+
+label {
+  cursor: default;
+  caret-color: transparent;
+}
+
+input,
+textarea,
+[contenteditable="true"] {
+  cursor: text !important;
+  caret-color: auto;
+}
+
+select,
+summary {
+  cursor: pointer !important;
+}
+
+button:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
 }
 
 input:focus, select:focus, textarea:focus {
@@ -118,10 +333,23 @@ input:focus, select:focus, textarea:focus {
   color: #18111a;
 }
 .input-field::placeholder {
-  color: #c4a7b8;
+  color: #94a3b8;
 }
 .input-field:disabled {
   background: #fdf2f8;
   opacity: 0.7;
   cursor: not-allowed;
+}
+
+/* Global readability tweaks for over-light utility shades */
+.text-slate-400 {
+  color: #64748b !important;
+}
+
+.text-slate-300 {
+  color: #94a3b8 !important;
+}
+
+.text-rose-300 {
+  color: #f43f5e !important;
 }

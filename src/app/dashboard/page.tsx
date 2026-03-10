@@ -7,11 +7,20 @@ import Navbar from "@/components/Navbar";
 import CreateRoomForm from "@/components/CreateRoomForm";
 import RoomList from "@/components/RoomList";
 import { subscribeToAuthState } from "@/lib/auth";
-import { createRoom, subscribeRoomsForUser, type Room, type RoomPrivacy, type RoomType } from "@/lib/firestore";
+import {
+  createRoom,
+  joinPublicChannel,
+  subscribePublicChannelSuggestions,
+  subscribeRoomsForUser,
+  type Room,
+  type RoomPrivacy,
+  type RoomType,
+} from "@/lib/firestore";
 
 export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [suggestions, setSuggestions] = useState<Room[]>([]);
 
   useEffect(() => {
     const unsubscribeAuth = subscribeToAuthState((nextUser) => {
@@ -26,60 +35,89 @@ export default function DashboardPage() {
     return unsubscribeRooms;
   }, [user]);
 
+  useEffect(() => {
+    if (!user) return;
+    const unsubscribeSuggestions = subscribePublicChannelSuggestions(user.uid, setSuggestions);
+    return unsubscribeSuggestions;
+  }, [user]);
+
   const roomSummary = useMemo(() => {
     const chats = rooms.filter((room) => room.type === "chat").length;
     const channels = rooms.filter((room) => room.type === "channel").length;
     return { chats, channels };
   }, [rooms]);
 
-  const handleCreateRoom = async (input: { name: string; type: RoomType; privacy: RoomPrivacy }) => {
+  const handleCreateRoom = async (input: {
+    name: string;
+    type: RoomType;
+    privacy: RoomPrivacy;
+    friendIds: string[];
+  }) => {
     if (!user) return;
 
-    await createRoom({
+    return createRoom({
       ...input,
       ownerId: user.uid,
     });
   };
 
+  const handleJoinSuggestion = async (roomId: string) => {
+    if (!user) return;
+    await joinPublicChannel(roomId, user.uid);
+  };
+
   return (
     <AuthGuard>
-      <div className="mesh-bg min-h-screen">
-        <Navbar userEmail={user?.email} />
+      <div className="mesh-bg fx-stage min-h-screen">
+        <Navbar username={user?.displayName} />
 
         <main className="mx-auto grid max-w-6xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-3 lg:px-8">
           {/* Sidebar */}
-          <section className="card p-6 lg:col-span-1">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-rose-400 to-fuchsia-500 shadow-sm shadow-rose-200">
-                <span>🏠</span>
+          <div className="space-y-6 lg:col-span-1">
+            <section className="card card-3d p-6">
+              <div className="flex items-center gap-2.5">
+                <div className="icon-chip h-9 w-9 text-rose-600">
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <rect x="3" y="3" width="8" height="8" rx="2" />
+                    <rect x="13" y="3" width="8" height="5" rx="2" />
+                    <rect x="13" y="10" width="8" height="11" rx="2" />
+                    <rect x="3" y="13" width="8" height="8" rx="2" />
+                  </svg>
+                </div>
+                <div>
+                  <h1 className="font-bold text-slate-900">Dashboard</h1>
+                  <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-rose-400">Opportunities bloom via people.</p>
+                </div>
               </div>
-              <div>
-                <h1 className="font-bold text-slate-900">Dashboard</h1>
-                <p className="text-xs text-slate-400">Your rooms &amp; activity</p>
-              </div>
-            </div>
 
-            <div className="mt-6 grid grid-cols-2 gap-3">
-              <div className="rounded-xl border border-rose-100 bg-gradient-to-br from-rose-50 to-pink-50/50 p-4 text-center">
-                <p className="text-3xl font-bold text-rose-500">{roomSummary.chats}</p>
-                <p className="mt-0.5 text-xs font-semibold uppercase tracking-wider text-rose-400">Chats</p>
+              <div className="mt-6 grid grid-cols-2 gap-3">
+                <div className="glass-panel card-3d rounded-xl p-4 text-center">
+                  <p className="text-3xl font-bold text-rose-500">{roomSummary.chats}</p>
+                  <p className="mt-0.5 text-xs font-semibold uppercase tracking-wider text-rose-400">Chats</p>
+                </div>
+                <div className="glass-panel card-3d rounded-xl p-4 text-center">
+                  <p className="text-3xl font-bold text-fuchsia-500">{roomSummary.channels}</p>
+                  <p className="mt-0.5 text-xs font-semibold uppercase tracking-wider text-fuchsia-400">Channels</p>
+                </div>
               </div>
-              <div className="rounded-xl border border-fuchsia-100 bg-gradient-to-br from-fuchsia-50 to-pink-50/50 p-4 text-center">
-                <p className="text-3xl font-bold text-fuchsia-500">{roomSummary.channels}</p>
-                <p className="mt-0.5 text-xs font-semibold uppercase tracking-wider text-fuchsia-400">Channels</p>
-              </div>
-            </div>
 
-            <div className="mt-5 rounded-xl border border-rose-100/60 bg-rose-50/40 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-rose-400">Tip</p>
-              <p className="mt-1 text-xs leading-relaxed text-slate-400">Create a public chat room and install the browser extension to share job links in one click.</p>
-            </div>
-          </section>
+              <div className="mt-5 glass-panel rounded-xl p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-rose-400">Bloom Tip</p>
+                <p className="mt-1 text-xs leading-relaxed text-slate-400">Create a room, invite people you trust, and share opportunities faster with the extension.</p>
+              </div>
+            </section>
+
+            <RoomList
+              rooms={rooms}
+              suggestions={suggestions}
+              currentUserId={user?.uid}
+              onJoinSuggestion={handleJoinSuggestion}
+            />
+          </div>
 
           {/* Main content */}
           <div className="space-y-6 lg:col-span-2">
             <CreateRoomForm onCreateRoom={handleCreateRoom} />
-            <RoomList rooms={rooms} currentUserId={user?.uid} />
           </div>
         </main>
       </div>
