@@ -46,7 +46,58 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await loginWithEmail(email.trim(), password);
+      const credential = await loginWithEmail(email.trim(), password);
+      const token = await credential.user.getIdToken();
+      let userId = credential.user.uid;
+      const backendUrl = window.location.origin;
+
+      try {
+        const response = await fetch(`${backendUrl}/api/extension/auth-link`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ token }),
+        });
+
+        if (response.ok) {
+          const linked = (await response.json()) as { userId?: string };
+          if (linked?.userId) {
+            userId = linked.userId;
+          }
+        }
+      } catch {
+        // Keep local login flow resilient if backend is temporarily unavailable.
+      }
+
+      window.localStorage.setItem("bloomveyAuthToken", token);
+      window.localStorage.setItem("bloomveyUserId", userId);
+      window.localStorage.setItem("bloomveyBackendUrl", backendUrl);
+
+      const chromeApi = (
+        window as Window & {
+          chrome?: {
+            storage?: {
+              local?: { set: (payload: { authToken: string; backendUrl: string }) => void };
+              sync?: { set: (payload: { authToken: string }) => void };
+            };
+          };
+        }
+      ).chrome;
+      if (chromeApi?.storage?.local?.set) {
+        chromeApi.storage.local.set({
+          authToken: token,
+          backendUrl,
+          userId,
+          currentUserId: userId,
+        });
+      }
+
+      if (chromeApi?.storage?.sync?.set) {
+        chromeApi.storage.sync.set({ authToken: token });
+      }
+
       router.push(nextUrl);
     } catch (error) {
       setError(getAuthErrorMessage(error));

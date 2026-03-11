@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import type { User } from "firebase/auth";
@@ -181,9 +182,9 @@ export default function RoomPage() {
   const roomAvatarElement = (
     <div className="icon-chip flex h-9 w-9 items-center justify-center overflow-hidden text-base">
       {avatarPreviewUrl ? (
-        <img src={avatarPreviewUrl} alt={`${room?.name ?? "room"} avatar preview`} className="h-full w-full object-cover" />
+        <Image src={avatarPreviewUrl} alt={`${room?.name ?? "room"} avatar preview`} width={36} height={36} className="h-full w-full object-cover" unoptimized />
       ) : room?.avatarUrl ? (
-        <img src={room.avatarUrl} alt={`${room.name} avatar`} className="h-full w-full object-cover" />
+        <Image src={room.avatarUrl} alt={`${room.name} avatar`} width={36} height={36} className="h-full w-full object-cover" unoptimized />
       ) : (
         <span className="text-rose-600">
           {room?.type === "chat" ? (
@@ -445,9 +446,9 @@ export default function RoomPage() {
                         <div className="relative">
                           <div className="icon-chip flex h-14 w-14 items-center justify-center overflow-hidden text-xl">
                             {avatarPreviewUrl ? (
-                              <img src={avatarPreviewUrl} alt={`${room.name} avatar preview`} className="h-full w-full object-cover" />
+                              <Image src={avatarPreviewUrl} alt={`${room.name} avatar preview`} width={56} height={56} className="h-full w-full object-cover" unoptimized />
                             ) : room.avatarUrl ? (
-                              <img src={room.avatarUrl} alt={`${room.name} avatar`} className="h-full w-full object-cover" />
+                              <Image src={room.avatarUrl} alt={`${room.name} avatar`} width={56} height={56} className="h-full w-full object-cover" unoptimized />
                             ) : (
                               <span className="text-rose-600">
                                 {room.type === "chat" ? (

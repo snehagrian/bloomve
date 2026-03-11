@@ -6,6 +6,7 @@ import AuthGuard from "@/components/AuthGuard";
 import Navbar from "@/components/Navbar";
 import CreateRoomForm from "@/components/CreateRoomForm";
 import RoomList from "@/components/RoomList";
+import NotesTab from "@/components/NotesTab";
 import { subscribeToAuthState } from "@/lib/auth";
 import {
   createRoom,
@@ -21,6 +22,7 @@ export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [suggestions, setSuggestions] = useState<Room[]>([]);
+  const [activeTab, setActiveTab] = useState<"chat" | "channels" | "notes">("chat");
 
   useEffect(() => {
     const unsubscribeAuth = subscribeToAuthState((nextUser) => {
@@ -117,7 +119,49 @@ export default function DashboardPage() {
 
           {/* Main content */}
           <div className="space-y-6 lg:col-span-2">
-            <CreateRoomForm onCreateRoom={handleCreateRoom} />
+            <section className="card p-3">
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("chat")}
+                  className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+                    activeTab === "chat"
+                      ? "bg-rose-500 text-white"
+                      : "border border-rose-200 bg-white text-rose-500 hover:bg-rose-50"
+                  }`}
+                >
+                  Chat
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("channels")}
+                  className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+                    activeTab === "channels"
+                      ? "bg-fuchsia-500 text-white"
+                      : "border border-fuchsia-200 bg-white text-fuchsia-500 hover:bg-fuchsia-50"
+                  }`}
+                >
+                  Channels
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("notes")}
+                  className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+                    activeTab === "notes"
+                      ? "bg-pink-500 text-white"
+                      : "border border-pink-200 bg-white text-pink-500 hover:bg-pink-50"
+                  }`}
+                >
+                  Notes
+                </button>
+              </div>
+            </section>
+
+            {activeTab === "notes" ? (
+              <NotesTab />
+            ) : (
+              <CreateRoomForm onCreateRoom={handleCreateRoom} />
+            )}
           </div>
         </main>
       </div>

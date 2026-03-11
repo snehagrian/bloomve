@@ -2,11 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, X-Bloomve-Secret",
-};
+function getCorsHeaders() {
+  const extensionId = process.env.BLOOMVEY_EXTENSION_ID || "YOUR_EXTENSION_ID";
+  return {
+    "Access-Control-Allow-Origin": `chrome-extension://${extensionId}`,
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Bloomve-Secret",
+  };
+}
 
 function getAdminDb() {
   if (!getApps().length) {
@@ -31,10 +34,12 @@ function getAdminDb() {
 }
 
 export async function OPTIONS() {
+  const corsHeaders = getCorsHeaders();
   return NextResponse.json({ ok: true }, { headers: corsHeaders });
 }
 
 export async function GET(request: NextRequest) {
+  const corsHeaders = getCorsHeaders();
   try {
     const sharedSecret = process.env.EXTENSION_SHARED_SECRET;
     const incomingSecret = request.headers.get("x-bloomve-secret");
@@ -68,6 +73,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const corsHeaders = getCorsHeaders();
   try {
     const sharedSecret = process.env.EXTENSION_SHARED_SECRET;
     const incomingSecret = request.headers.get("x-bloomve-secret");

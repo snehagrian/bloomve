@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BloomVe Chats</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        background: #eef2ff;
+        font-family: Inter, Arial, sans-serif;
+      }
+
+      #panel {
+        width: 100%;
+        height: 100%;
+        box-sizing: border-box;
+        padding: 10px;
+      }
+
+      .card {
+        width: 100%;
+        height: 100%;
+        box-sizing: border-box;
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 16px;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #e5e7eb;
+      }
+
+      .logo {
+        width: 26px;
+        height: 26px;
+      }
+
+      .title {
+        margin: 0;
+        font-size: 16px;
+        color: #111827;
+      }
+
+      .sub {
+        margin: 2px 0 0;
+        font-size: 11px;
+        color: #6b7280;
+      }
+
+      button {
+        width: 100%;
+        box-sizing: border-box;
+        border-radius: 8px;
+        padding: 9px 10px;
+        font-size: 13px;
+      }
+
+      button {
+        border: none;
+        background: #4f46e5;
+        color: #ffffff;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      button:hover {
+        background: #4338ca;
+      }
+
+      .secondary {
+        background: #ffffff;
+        border: 1px solid #d1d5db;
+        color: #111827;
+      }
+
+      .secondary:hover {
+        background: #f9fafb;
+      }
+
+      #chatList {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        flex: 1;
+        overflow-y: auto;
+        border: 1px solid #d1d5db;
+        border-radius: 10px;
+        background: #ffffff;
+      }
+
+      .chat-item {
+        padding: 10px;
+        border-bottom: 1px solid #f3f4f6;
+        cursor: pointer;
+      }
+
+      .chat-item:last-child {
+        border-bottom: none;
+      }
+
+      .chat-item:hover {
+        background: #f9fafb;
+      }
+
+      .chat-item.active {
+        background: #eef2ff;
+      }
+
+      .chat-name {
+        margin: 0;
+        font-size: 13px;
+        font-weight: 600;
+        color: #111827;
+      }
+
+      .chat-meta {
+        margin-top: 2px;
+        font-size: 11px;
+        color: #6b7280;
+      }
+
+      .composer {
+        border-top: 1px solid #e5e7eb;
+        padding-top: 10px;
+      }
+
+      .meta {
+        margin-top: 8px;
+        padding: 8px;
+        background: #f9fafb;
+        border-radius: 8px;
+        font-size: 11px;
+        color: #4b5563;
+        word-break: break-word;
+      }
+
+      #status {
+        font-size: 11px;
+        color: #4b5563;
+      }
+
+      #unsupported {
+        display: none;
+        font-size: 12px;
+        color: #4b5563;
+        padding: 8px;
+        border: 1px solid #f3f4f6;
+        border-radius: 8px;
+        background: #fafafa;
+      }
+
+      #unsupported strong {
+        color: #111827;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="panel">
+      <div class="card">
+        <div class="header">
+          <img id="brandLogo" class="logo" src="icons/icon-32.png" alt="Bloomvey logo" />
+          <div>
+            <h1 class="title">Bloomvey</h1>
+            <p class="sub">Chats</p>
+          </div>
+        </div>
+
+        <ul id="chatList"></ul>
+
+        <div class="composer">
+          <button id="saveJobBtn" class="secondary">Save Job to Notes</button>
+          <button id="shareBtn">Share Job</button>
+          <div class="meta" id="currentUrl">Loading current job URL...</div>
+        </div>
+
+        <div id="unsupported">
+          <strong>Bloomvey works on LinkedIn, Indeed, and Workday job pages.</strong>
+        </div>
+
+        <div id="status"></div>
+      </div>
+    </div>
+
+    <script src="sidepanel.js"></script>
+  </body>
+</html>

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import type { Room } from "@/lib/firestore";
 
 type RoomListProps = {
@@ -51,7 +52,7 @@ export default function RoomList({ rooms, suggestions, currentUserId, onJoinSugg
                     <div className="flex flex-wrap items-center gap-2">
                       <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-gradient-to-br from-rose-100 to-fuchsia-100 text-sm">
                         {room.avatarUrl ? (
-                          <img src={room.avatarUrl} alt={`${room.name} avatar`} className="h-full w-full object-cover" />
+                          <Image src={room.avatarUrl} alt={`${room.name} avatar`} width={32} height={32} className="h-full w-full object-cover" unoptimized />
                         ) : (
                           <span className="text-rose-600">
                             {room.type === "chat" ? (
@@ -115,7 +116,7 @@ export default function RoomList({ rooms, suggestions, currentUserId, onJoinSugg
                 <div className="flex flex-wrap items-center gap-2">
                   <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-gradient-to-br from-emerald-100 to-teal-100 text-sm">
                     {room.avatarUrl ? (
-                      <img src={room.avatarUrl} alt={`${room.name} avatar`} className="h-full w-full object-cover" />
+                      <Image src={room.avatarUrl} alt={`${room.name} avatar`} width={32} height={32} className="h-full w-full object-cover" unoptimized />
                     ) : (
                       <span className="text-emerald-600">
                         <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

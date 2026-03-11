@@ -1,112 +1,583 @@
-const apiBaseUrlInput = document.getElementById("apiBaseUrl");
-const secretInput = document.getElementById("secret");
-const roomIdInput = document.getElementById("roomId");
-const titleInput = document.getElementById("title");
 const roomSelect = document.getElementById("roomSelect");
 const currentUrlEl = document.getElementById("currentUrl");
 const statusEl = document.getElementById("status");
+const loginRequiredEl = document.getElementById("loginRequired");
+const mainContentEl = document.getElementById("mainContent");
+const openLoginBtn = document.getElementById("openLoginBtn");
 const shareBtn = document.getElementById("shareBtn");
 const refreshRoomsBtn = document.getElementById("refreshRooms");
+const saveJobBtn = document.getElementById("saveJobBtn");
+const addToNotesIconBtn = document.getElementById("addToNotesIconBtn");
+const saveRecruitersBtn = document.getElementById("saveRecruitersBtn");
+const recruitersJobField = document.getElementById("recruitersJobField");
+const recruitersJobSelect = document.getElementById("recruitersJobSelect");
+const confirmSaveRecruitersBtn = document.getElementById("confirmSaveRecruitersBtn");
+const popupCard = document.getElementById("popupCard");
+const POPUP_ANIMATION_MS = 300;
+
+const RECRUITERS_STORAGE_KEY = "bloomveLinkedInRecruiters";
 
 let activeTabUrl = "";
+let recruiterPayload = null;
+let closeRequested = false;
+let authToken = "";
+let backendUrl = "";
+
+function getChromeApi() {
+  try {
+    if (typeof globalThis === "undefined") return null;
+    return globalThis.chrome || null;
+  } catch {
+    return null;
+  }
+}
+
+function getStorageArea(name) {
+  const chromeApi = getChromeApi();
+  const storageArea = chromeApi?.storage?.[name] || null;
+  if (!storageArea || typeof storageArea.get !== "function") {
+    return null;
+  }
+  return storageArea;
+}
+
+function hasExtensionContext() {
+  const chromeApi = getChromeApi();
+  return !!chromeApi?.runtime?.id;
+}
+
+function readStorage(name, keys) {
+  return new Promise((resolve) => {
+    const storageArea = getStorageArea(name);
+    if (!storageArea) {
+      resolve({});
+      return;
+    }
+
+    try {
+      storageArea.get(keys, (result) => {
+        const chromeApi = getChromeApi();
+        if (chromeApi?.runtime?.lastError) {
+          resolve({});
+          return;
+        }
+        resolve(result || {});
+      });
+    } catch {
+      resolve({});
+    }
+  });
+}
+
+async function readLocal(keys) {
+  return readStorage("local", keys);
+}
+
+function writeStorage(name, payload) {
+  return new Promise((resolve) => {
+    const storageArea = getStorageArea(name);
+    if (!storageArea || typeof storageArea.set !== "function") {
+      resolve(false);
+      return;
+    }
+
+    try {
+      storageArea.set(payload, (result) => {
+        const chromeApi = getChromeApi();
+        if (chromeApi?.runtime?.lastError) {
+          resolve(false);
+          return;
+        }
+        resolve(result || true);
+      });
+    } catch {
+      resolve(false);
+    }
+  });
+}
+
+async function writeLocal(payload) {
+  return writeStorage("local", payload);
+}
+
+async function readSync(keys) {
+  return readStorage("sync", keys);
+}
+
+async function readAccountFromStorage() {
+  const fromLocal = await readLocal(["userId", "currentUserId"]);
+  if (fromLocal?.userId || fromLocal?.currentUserId) {
+    return fromLocal;
+  }
+  return readSync(["userId", "currentUserId"]);
+}
+
+async function safeTabsQuery(queryInfo) {
+  try {
+    const chromeApi = getChromeApi();
+    if (!chromeApi?.tabs?.query) return [];
+    return (await chromeApi.tabs.query(queryInfo)) || [];
+  } catch {
+    return [];
+  }
+}
+
+async function safeExecuteScript(tabId, files) {
+  try {
+    const chromeApi = getChromeApi();
+    if (!chromeApi?.scripting?.executeScript || !tabId) return false;
+    await chromeApi.scripting.executeScript({
+      target: { tabId },
+      files,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function safeCreateTab(url) {
+  try {
+    const chromeApi = getChromeApi();
+    if (!chromeApi?.tabs?.create) return false;
+    await chromeApi.tabs.create({ url });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function animatePopupOpen() {
+  if (!popupCard) return;
+
+  requestAnimationFrame(() => {
+    popupCard.classList.remove("is-closing");
+    popupCard.classList.add("is-open");
+  });
+}
+
+function animatePopupClose() {
+  if (!popupCard || closeRequested) return;
+
+  closeRequested = true;
+  popupCard.classList.remove("is-open");
+  popupCard.classList.add("is-closing");
+
+  window.setTimeout(() => {
+    window.close();
+  }, POPUP_ANIMATION_MS);
+}
+
+window.addEventListener("blur", () => {
+  window.setTimeout(() => {
+    if (!document.hasFocus()) {
+      animatePopupClose();
+    }
+  }, 0);
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    animatePopupClose();
+  }
+});
 
 function setStatus(message, isError = false) {
   statusEl.textContent = message;
   statusEl.style.color = isError ? "#dc2626" : "#4b5563";
 }
 
+function setAuthRequiredUi(isRequired) {
+  loginRequiredEl.style.display = isRequired ? "block" : "none";
+  mainContentEl.style.display = isRequired ? "none" : "block";
+}
+
+async function loadAuthAndBackend() {
+  const data = await readLocal(["authToken", "idToken", "backendUrl"]);
+  authToken = data?.authToken || data?.idToken || "";
+  backendUrl = data?.backendUrl || "";
+  await ensureBackendUrl();
+
+  return { authToken, backendUrl };
+}
+
+function isBloomveyUrl(url = "") {
+  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//i.test(url) || /https?:\/\/([\w-]+\.)?(bloomve|bloomvey)\.app\//i.test(url);
+}
+
+async function detectBloomveyOriginFromTabs() {
+  const tabs = await safeTabsQuery({});
+  const websiteTab = tabs.find((tab) => isBloomveyUrl(tab.url || "") && tab.url);
+  if (!websiteTab?.url) return "";
+
+  try {
+    return new URL(websiteTab.url).origin;
+  } catch {
+    return "";
+  }
+}
+
+function getFallbackBackendCandidates(detectedOrigin = "") {
+  const defaultCandidates = ["http://localhost:3000", "http://localhost:3002", "http://localhost:5000"];
+  if (!backendUrl) {
+    return [...new Set([detectedOrigin, ...defaultCandidates].filter(Boolean))];
+  }
+
+  if (/^https?:\/\/(localhost|127\.0\.0\.1):5000$/i.test(backendUrl)) {
+    return [...new Set([detectedOrigin, "http://localhost:3000", "http://localhost:3002", backendUrl].filter(Boolean))];
+  }
+
+  return [...new Set([detectedOrigin, backendUrl, ...defaultCandidates].filter(Boolean))];
+}
+
+async function ensureBackendUrl() {
+  if (backendUrl) return backendUrl;
+
+  const detectedOrigin = await detectBloomveyOriginFromTabs();
+  if (detectedOrigin) {
+    backendUrl = detectedOrigin;
+    await writeLocal({ backendUrl: detectedOrigin });
+    return backendUrl;
+  }
+
+  backendUrl = "http://localhost:3000";
+  return backendUrl;
+}
+
+async function trySyncAuthFromBloomveyTab() {
+  if (!hasExtensionContext()) return;
+
+  try {
+    const tabs = await safeTabsQuery({});
+    const websiteTabs = tabs.filter((tab) => isBloomveyUrl(tab.url || "") && tab.id);
+    if (!websiteTabs.length) return;
+
+    await Promise.all(
+      websiteTabs.map((tab) => safeExecuteScript(tab.id, ["authBridge.js"]))
+    );
+  } catch {
+    return;
+  }
+}
+
 async function getCurrentTabUrl() {
-  const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+  const tabs = await safeTabsQuery({ active: true, currentWindow: true });
   const tab = tabs?.[0];
   activeTabUrl = tab?.url || "";
   currentUrlEl.textContent = activeTabUrl || "No active tab URL found.";
 }
 
-function getConfig() {
-  return {
-    apiBaseUrl: apiBaseUrlInput.value.trim(),
-    secret: secretInput.value.trim(),
-    roomId: roomIdInput.value.trim(),
-  };
-}
-
-async function saveConfig() {
-  const config = getConfig();
-  await chrome.storage.sync.set(config);
-}
-
 async function loadConfig() {
-  const saved = await chrome.storage.sync.get(["apiBaseUrl", "secret", "roomId"]);
-  apiBaseUrlInput.value = saved.apiBaseUrl || "http://localhost:3000";
-  secretInput.value = saved.secret || "";
-  roomIdInput.value = saved.roomId || "";
+  const saved = await readLocal(["backendUrl"]);
+  backendUrl = saved.backendUrl || "";
+  await ensureBackendUrl();
 }
 
-async function fetchRooms() {
-  const { apiBaseUrl, secret } = getConfig();
+function normalizeChannelItems(data) {
+  const items = [];
 
-  if (!apiBaseUrl || !secret) {
-    setStatus("Set API base URL and secret first.", true);
+  if (Array.isArray(data?.channels)) {
+    data.channels.forEach((channel) => items.push({ ...channel, kind: "channel" }));
+  }
+
+  if (Array.isArray(data?.chats)) {
+    data.chats.forEach((chat) => items.push({ ...chat, kind: "chat" }));
+  }
+
+  if (Array.isArray(data?.items)) {
+    data.items.forEach((item) => items.push(item));
+  }
+
+  return items;
+}
+
+function normalizeNotesItems(data) {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.notes)) return data.notes;
+  if (Array.isArray(data?.items)) return data.items;
+  return [];
+}
+
+function getJobLabel(job) {
+  const title = job.title || job.jobTitle || "Untitled job";
+  const company = job.company || "Unknown company";
+  return `${title} — ${company}`;
+}
+
+function setRecruiterControlsVisibility() {
+  const hasRecruiters = Array.isArray(recruiterPayload?.recruiters) && recruiterPayload.recruiters.length > 0;
+  saveRecruitersBtn.style.display = hasRecruiters ? "block" : "none";
+
+  if (!hasRecruiters) {
+    recruitersJobField.style.display = "none";
+    recruitersJobSelect.innerHTML = '<option value="">Select a saved job</option>';
+  }
+}
+
+async function loadRecruitersFromStorage() {
+  const stored = await readLocal([RECRUITERS_STORAGE_KEY]);
+  recruiterPayload = stored?.[RECRUITERS_STORAGE_KEY] || null;
+  setRecruiterControlsVisibility();
+}
+
+async function loadSavedJobsForRecruiters() {
+  if (!backendUrl || !authToken) {
+    setStatus("Please log in to Bloomvey first", true);
+    return false;
+  }
+
+  const response = await fetch(`${backendUrl}/api/notes`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${authToken}`,
+    },
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data?.error || "Could not load saved jobs.");
+  }
+
+  const jobs = normalizeNotesItems(data);
+  recruitersJobSelect.innerHTML = '<option value="">Select a saved job</option>';
+
+  jobs.forEach((job) => {
+    const jobId = job.id || job.jobId || job.noteId || job._id;
+    if (!jobId) return;
+
+    const option = document.createElement("option");
+    option.value = jobId;
+    option.textContent = getJobLabel(job);
+    recruitersJobSelect.appendChild(option);
+  });
+
+  return true;
+}
+
+async function fetchChannels() {
+  if (!authToken) {
+    setStatus("Please log in to Bloomvey first", true);
+    return;
+  }
+
+  const account = await readAccountFromStorage();
+  const userId = account.userId || account.currentUserId || "";
+  const detectedOrigin = await detectBloomveyOriginFromTabs();
+  const backendCandidates = getFallbackBackendCandidates(detectedOrigin);
+
+  try {
+    setStatus("Loading channels...");
+
+    let response = null;
+    let data = null;
+    let lastError = null;
+
+    for (const candidate of backendCandidates) {
+      try {
+        const candidateResponse = await fetch(`${candidate}/api/channels`, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+            "X-Bloomve-User-Id": userId,
+          },
+        });
+
+        const candidateData = await candidateResponse.json();
+
+        if (candidateResponse.ok || candidateResponse.status === 401) {
+          response = candidateResponse;
+          data = candidateData;
+
+          if (candidate !== backendUrl) {
+            backendUrl = candidate;
+            await writeLocal({ backendUrl: candidate });
+          }
+          break;
+        }
+
+        lastError = new Error(candidateData?.error || "Could not fetch channels.");
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    if (!response) {
+      throw lastError || new Error("Could not fetch channels.");
+    }
+
+    if (response.status === 401) {
+      setStatus("Session expired — please log in again.", true);
+      setAuthRequiredUi(true);
+      return;
+    }
+
+    if (!response.ok) {
+      throw new Error(data?.error || "Could not fetch channels.");
+    }
+
+    const channels = normalizeChannelItems(data);
+    roomSelect.innerHTML = '<option value="">Select a channel or chat</option>';
+
+    channels.forEach((channel) => {
+      const option = document.createElement("option");
+      const channelId = channel.id || channel.channelId;
+      const channelName = channel.name || channel.title || "Untitled";
+      const typeLabel = channel.kind || channel.type || "channel";
+
+      option.value = channelId;
+      option.textContent = `${channelName} (${typeLabel})`;
+      option.dataset.channelName = channelName;
+      roomSelect.appendChild(option);
+    });
+
+    setStatus(`Loaded ${channels.length} channels/chats.`);
+  } catch (error) {
+    console.error("Failed to fetch channels:", error);
+    setStatus("Failed to fetch channels - check console for details", true);
+  }
+}
+
+openLoginBtn.addEventListener("click", async () => {
+  const detectedOrigin = await detectBloomveyOriginFromTabs();
+  const loginUrl = `${detectedOrigin || backendUrl || "http://localhost:3000"}/login`;
+  await safeCreateTab(loginUrl);
+});
+
+refreshRoomsBtn.addEventListener("click", async () => {
+  await fetchChannels();
+});
+
+saveRecruitersBtn.addEventListener("click", async () => {
+  try {
+    if (!Array.isArray(recruiterPayload?.recruiters) || recruiterPayload.recruiters.length === 0) {
+      setStatus("No recruiter data available yet.", true);
+      return;
+    }
+
+    saveRecruitersBtn.disabled = true;
+    setStatus("Loading saved jobs...");
+    const loaded = await loadSavedJobsForRecruiters();
+
+    if (loaded) {
+      recruitersJobField.style.display = "block";
+      setStatus("Pick a saved job for these recruiters.");
+    }
+  } catch (error) {
+    setStatus(error.message || "Failed to load saved jobs.", true);
+  } finally {
+    saveRecruitersBtn.disabled = false;
+  }
+});
+
+confirmSaveRecruitersBtn.addEventListener("click", async () => {
+  const jobId = recruitersJobSelect.value;
+  const recruiters = Array.isArray(recruiterPayload?.recruiters) ? recruiterPayload.recruiters : [];
+
+  if (!backendUrl || !authToken || !jobId || recruiters.length === 0) {
+    setStatus("Choose a job and ensure recruiter data is available.", true);
     return;
   }
 
   try {
-    setStatus("Loading rooms...");
+    confirmSaveRecruitersBtn.disabled = true;
+    setStatus("Saving recruiters...");
 
-    const response = await fetch(`${apiBaseUrl}/api/share`, {
-      method: "GET",
+    const response = await fetch(`${backendUrl}/api/notes/${encodeURIComponent(jobId)}/recruiters`, {
+      method: "POST",
       headers: {
-        "X-Bloomve-Secret": secret,
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${authToken}`,
       },
+      body: JSON.stringify({ recruiters }),
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data?.error || "Could not fetch rooms.");
+      throw new Error(data?.error || "Failed to save recruiters.");
     }
 
-    roomSelect.innerHTML = '<option value="">Select a room</option>';
-
-    data.rooms.forEach((room) => {
-      const option = document.createElement("option");
-      option.value = room.id;
-      option.textContent = `${room.name} (${room.type}/${room.privacy})`;
-      roomSelect.appendChild(option);
-    });
-
-    if (roomIdInput.value) {
-      roomSelect.value = roomIdInput.value;
-    }
-
-    setStatus(`Loaded ${data.rooms.length} rooms.`);
+    setStatus("Recruiters saved ✓");
   } catch (error) {
-    setStatus(error.message || "Room load failed.", true);
+    setStatus(error.message || "Failed to save recruiters.", true);
+  } finally {
+    confirmSaveRecruitersBtn.disabled = false;
   }
+});
+
+if (getChromeApi()?.runtime?.onMessage?.addListener) {
+  getChromeApi().runtime.onMessage.addListener((message) => {
+    if (message?.type === "BLOOMVE_RECRUITERS_READY") {
+      recruiterPayload = message.payload || recruiterPayload;
+      setRecruiterControlsVisibility();
+    }
+  });
 }
 
-roomSelect.addEventListener("change", () => {
-  if (roomSelect.value) {
-    roomIdInput.value = roomSelect.value;
-    saveConfig();
+saveJobBtn.addEventListener("click", async () => {
+  if (!backendUrl) {
+    setStatus("Failed to save — please try again", true);
+    return;
+  }
+
+  saveJobBtn.disabled = true;
+
+  try {
+    const { bloomveCurrentJob } = await readLocal(["bloomveCurrentJob"]);
+    const auth = await readAccountFromStorage();
+    const userId = auth.userId || auth.currentUserId || "";
+
+    if (!authToken || !bloomveCurrentJob) {
+      throw new Error("missing-auth-or-job-data");
+    }
+
+    const payload = bloomveCurrentJob.onlyUrlAvailable
+      ? {
+          url: bloomveCurrentJob.url || activeTabUrl || "",
+          userId,
+        }
+      : {
+          userId,
+          title: bloomveCurrentJob.title || "",
+          company: bloomveCurrentJob.company || "",
+          location: bloomveCurrentJob.location || "",
+          salary: bloomveCurrentJob.salary || "Not listed",
+          url: bloomveCurrentJob.url || activeTabUrl || "",
+        };
+
+    const response = await fetch(`${backendUrl}/api/notes`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${authToken}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error("save-failed");
+    }
+
+    setStatus("Job saved to Bloomvey Notes ✓");
+  } catch {
+    setStatus("Failed to save — please try again", true);
+  } finally {
+    saveJobBtn.disabled = false;
   }
 });
 
-[apiBaseUrlInput, secretInput, roomIdInput].forEach((el) => {
-  el.addEventListener("change", saveConfig);
-});
-
-refreshRoomsBtn.addEventListener("click", async () => {
-  await saveConfig();
-  await fetchRooms();
+addToNotesIconBtn.addEventListener("click", async () => {
+  saveJobBtn.click();
 });
 
 shareBtn.addEventListener("click", async () => {
-  const { apiBaseUrl, secret, roomId } = getConfig();
-  const title = titleInput.value.trim();
+  const channelId = roomSelect.value;
+  const selectedOption = roomSelect.options[roomSelect.selectedIndex];
+  const selectedChannelName = selectedOption?.dataset?.channelName || selectedOption?.textContent || "Channel";
 
-  if (!apiBaseUrl || !secret || !roomId) {
-    setStatus("API base URL, secret, and room ID are required.", true);
+  if (!backendUrl || !authToken || !channelId) {
+    setStatus("API base URL, auth token, and channel selection are required.", true);
     return;
   }
 
@@ -119,16 +590,14 @@ shareBtn.addEventListener("click", async () => {
     setStatus("Sharing...");
     shareBtn.disabled = true;
 
-    const response = await fetch(`${apiBaseUrl}/api/share`, {
+    const response = await fetch(`${backendUrl}/api/channels/${encodeURIComponent(channelId)}/messages`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Bloomve-Secret": secret,
+        Authorization: `Bearer ${authToken}`,
       },
       body: JSON.stringify({
-        roomId,
-        jobUrl: activeTabUrl,
-        title,
+        message: activeTabUrl,
       }),
     });
 
@@ -138,7 +607,7 @@ shareBtn.addEventListener("click", async () => {
       throw new Error(data?.error || "Share failed.");
     }
 
-    setStatus("Job URL shared successfully.");
+    setStatus(`Shared to ${selectedChannelName} ✓`);
   } catch (error) {
     setStatus(error.message || "Share failed.", true);
   } finally {
@@ -147,7 +616,23 @@ shareBtn.addEventListener("click", async () => {
 });
 
 (async function init() {
+  animatePopupOpen();
   await loadConfig();
   await getCurrentTabUrl();
-  await fetchRooms();
+  await loadAuthAndBackend();
+
+  if (!authToken) {
+    await trySyncAuthFromBloomveyTab();
+    await loadAuthAndBackend();
+  }
+
+  if (!authToken) {
+    setAuthRequiredUi(true);
+    setStatus("Please log in to Bloomvey first", true);
+    return;
+  }
+
+  setAuthRequiredUi(false);
+  await loadRecruitersFromStorage();
+  await fetchChannels();
 })();

@@ -1,0 +1,3 @@
+(() => {
+  // Bloomvey content script placeholder.
+})();
