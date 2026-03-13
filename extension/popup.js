@@ -1,4 +1,4 @@
-const roomSelect = document.getElementById("roomSelect");
+const roomSelectionList = document.getElementById("roomSelectionList");
 const currentUrlEl = document.getElementById("currentUrl");
 const statusEl = document.getElementById("status");
 const loginRequiredEl = document.getElementById("loginRequired");
@@ -16,12 +16,14 @@ const popupCard = document.getElementById("popupCard");
 const POPUP_ANIMATION_MS = 300;
 
 const RECRUITERS_STORAGE_KEY = "bloomveLinkedInRecruiters";
+const CHANNELS_REFRESH_INTERVAL_MS = 15000;
 
 let activeTabUrl = "";
 let recruiterPayload = null;
-let closeRequested = false;
 let authToken = "";
 let backendUrl = "";
+let channelsRefreshTimer = null;
+let isFetchingChannels = false;
 
 function getChromeApi() {
   try {
@@ -150,37 +152,9 @@ async function safeCreateTab(url) {
 function animatePopupOpen() {
   if (!popupCard) return;
 
-  requestAnimationFrame(() => {
-    popupCard.classList.remove("is-closing");
-    popupCard.classList.add("is-open");
-  });
+  popupCard.classList.remove("is-closing");
+  popupCard.classList.add("is-open");
 }
-
-function animatePopupClose() {
-  if (!popupCard || closeRequested) return;
-
-  closeRequested = true;
-  popupCard.classList.remove("is-open");
-  popupCard.classList.add("is-closing");
-
-  window.setTimeout(() => {
-    window.close();
-  }, POPUP_ANIMATION_MS);
-}
-
-window.addEventListener("blur", () => {
-  window.setTimeout(() => {
-    if (!document.hasFocus()) {
-      animatePopupClose();
-    }
-  }, 0);
-});
-
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") {
-    animatePopupClose();
-  }
-});
 
 function setStatus(message, isError = false) {
   statusEl.textContent = message;
@@ -274,21 +248,117 @@ async function loadConfig() {
 }
 
 function normalizeChannelItems(data) {
-  const items = [];
-
-  if (Array.isArray(data?.channels)) {
-    data.channels.forEach((channel) => items.push({ ...channel, kind: "channel" }));
+  if (!Array.isArray(data?.items)) {
+    return [];
   }
 
-  if (Array.isArray(data?.chats)) {
-    data.chats.forEach((chat) => items.push({ ...chat, kind: "chat" }));
+  const merged = new Map();
+  data.items.forEach((item) => {
+    const id = item?.id;
+    if (!id) return;
+
+    merged.set(id, {
+      ...item,
+      id,
+      kind: item?.kind || item?.type || "channel",
+    });
+  });
+
+  return Array.from(merged.values());
+}
+
+function renderRoomSelection(items) {
+  roomSelectionList.innerHTML = "";
+
+  if (!items.length) {
+    const empty = document.createElement("div");
+    empty.className = "room-selection-empty";
+    empty.textContent = "No chats/channels found.";
+    roomSelectionList.appendChild(empty);
+    return;
   }
 
-  if (Array.isArray(data?.items)) {
-    data.items.forEach((item) => items.push(item));
-  }
+  items.forEach((room) => {
+    const roomId = room.id || room.channelId;
+    if (!roomId) return;
 
-  return items;
+    const row = document.createElement("label");
+    row.className = "room-selection-item";
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.className = "room-selection-checkbox";
+    checkbox.value = roomId;
+    checkbox.dataset.channelName = room.name || room.title || "Untitled";
+    checkbox.dataset.channelKind = room.kind || room.type || "channel";
+    checkbox.style.position = "absolute";
+    checkbox.style.opacity = "0";
+    checkbox.style.pointerEvents = "none";
+
+    const roundCheck = document.createElement("span");
+    roundCheck.className = "room-selection-round-check";
+    roundCheck.setAttribute("aria-hidden", "true");
+    roundCheck.style.width = "18px";
+    roundCheck.style.height = "18px";
+    roundCheck.style.minWidth = "18px";
+    roundCheck.style.borderRadius = "999px";
+    roundCheck.style.border = "1.5px solid #374151";
+    roundCheck.style.background = "#ffffff";
+    roundCheck.style.display = "inline-flex";
+    roundCheck.style.alignItems = "center";
+    roundCheck.style.justifyContent = "center";
+    roundCheck.style.color = "#ffffff";
+    roundCheck.style.fontSize = "11px";
+    roundCheck.style.fontWeight = "700";
+    roundCheck.style.lineHeight = "1";
+    roundCheck.style.flex = "0 0 auto";
+    roundCheck.style.transition = "all 120ms ease";
+
+    const labelContent = document.createElement("span");
+    labelContent.className = "room-selection-label";
+
+    const name = document.createElement("span");
+    name.className = "room-selection-name";
+    name.textContent = checkbox.dataset.channelName;
+
+    const kind = document.createElement("span");
+    kind.className = "room-selection-kind";
+    kind.textContent = checkbox.dataset.channelKind;
+
+    labelContent.appendChild(name);
+    labelContent.appendChild(kind);
+
+    const syncSelectedState = () => {
+      const isSelected = checkbox.checked;
+      row.classList.toggle("is-selected", isSelected);
+      row.style.background = isSelected ? "#ecfdf5" : "";
+
+      if (isSelected) {
+        roundCheck.style.borderColor = "#16a34a";
+        roundCheck.style.background = "#16a34a";
+        roundCheck.textContent = "✓";
+      } else {
+        roundCheck.style.borderColor = "#374151";
+        roundCheck.style.background = "#ffffff";
+        roundCheck.textContent = "";
+      }
+    };
+
+    checkbox.addEventListener("change", syncSelectedState);
+
+    row.appendChild(checkbox);
+    row.appendChild(roundCheck);
+    row.appendChild(labelContent);
+    roomSelectionList.appendChild(row);
+    syncSelectedState();
+  });
+}
+
+function getSelectedRooms() {
+  return Array.from(roomSelectionList.querySelectorAll('input[type="checkbox"]:checked')).map((input) => ({
+    id: input.value,
+    name: input.dataset.channelName || "Channel",
+  }));
 }
 
 function normalizeNotesItems(data) {
@@ -356,8 +426,15 @@ async function loadSavedJobsForRecruiters() {
 }
 
 async function fetchChannels() {
+  if (isFetchingChannels) {
+    return;
+  }
+
+  isFetchingChannels = true;
+
   if (!authToken) {
     setStatus("Please log in to Bloomvey first", true);
+    isFetchingChannels = false;
     return;
   }
 
@@ -417,25 +494,34 @@ async function fetchChannels() {
     }
 
     const channels = normalizeChannelItems(data);
-    roomSelect.innerHTML = '<option value="">Select a channel or chat</option>';
-
-    channels.forEach((channel) => {
-      const option = document.createElement("option");
-      const channelId = channel.id || channel.channelId;
-      const channelName = channel.name || channel.title || "Untitled";
-      const typeLabel = channel.kind || channel.type || "channel";
-
-      option.value = channelId;
-      option.textContent = `${channelName} (${typeLabel})`;
-      option.dataset.channelName = channelName;
-      roomSelect.appendChild(option);
-    });
+    renderRoomSelection(channels);
 
     setStatus(`Loaded ${channels.length} channels/chats.`);
   } catch (error) {
     console.error("Failed to fetch channels:", error);
     setStatus("Failed to fetch channels - check console for details", true);
+  } finally {
+    isFetchingChannels = false;
   }
+}
+
+function stopChannelsAutoRefresh() {
+  if (channelsRefreshTimer) {
+    window.clearInterval(channelsRefreshTimer);
+    channelsRefreshTimer = null;
+  }
+}
+
+function startChannelsAutoRefresh() {
+  stopChannelsAutoRefresh();
+
+  channelsRefreshTimer = window.setInterval(() => {
+    if (document.hidden || !authToken) {
+      return;
+    }
+
+    void fetchChannels();
+  }, CHANNELS_REFRESH_INTERVAL_MS);
 }
 
 openLoginBtn.addEventListener("click", async () => {
@@ -446,6 +532,21 @@ openLoginBtn.addEventListener("click", async () => {
 
 refreshRoomsBtn.addEventListener("click", async () => {
   await fetchChannels();
+});
+
+window.addEventListener("focus", () => {
+  if (!authToken) return;
+  void fetchChannels();
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && authToken) {
+    void fetchChannels();
+  }
+});
+
+window.addEventListener("beforeunload", () => {
+  stopChannelsAutoRefresh();
 });
 
 saveRecruitersBtn.addEventListener("click", async () => {
@@ -572,12 +673,10 @@ addToNotesIconBtn.addEventListener("click", async () => {
 });
 
 shareBtn.addEventListener("click", async () => {
-  const channelId = roomSelect.value;
-  const selectedOption = roomSelect.options[roomSelect.selectedIndex];
-  const selectedChannelName = selectedOption?.dataset?.channelName || selectedOption?.textContent || "Channel";
+  const selectedRooms = getSelectedRooms();
 
-  if (!backendUrl || !authToken || !channelId) {
-    setStatus("API base URL, auth token, and channel selection are required.", true);
+  if (!backendUrl || !authToken || selectedRooms.length === 0) {
+    setStatus("API base URL, auth token, and at least one chat/channel selection are required.", true);
     return;
   }
 
@@ -590,24 +689,30 @@ shareBtn.addEventListener("click", async () => {
     setStatus("Sharing...");
     shareBtn.disabled = true;
 
-    const response = await fetch(`${backendUrl}/api/channels/${encodeURIComponent(channelId)}/messages`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${authToken}`,
-      },
-      body: JSON.stringify({
-        message: activeTabUrl,
-      }),
-    });
+    const results = await Promise.all(
+      selectedRooms.map(async (room) => {
+        const response = await fetch(`${backendUrl}/api/channels/${encodeURIComponent(room.id)}/messages`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${authToken}`,
+          },
+          body: JSON.stringify({
+            message: activeTabUrl,
+          }),
+        });
 
-    const data = await response.json();
+        const data = await response.json();
 
-    if (!response.ok) {
-      throw new Error(data?.error || "Share failed.");
-    }
+        if (!response.ok) {
+          throw new Error(data?.error || `Share failed for ${room.name}.`);
+        }
 
-    setStatus(`Shared to ${selectedChannelName} ✓`);
+        return room.name;
+      })
+    );
+
+    setStatus(`Shared to ${results.length} chat(s)/channel(s) ✓`);
   } catch (error) {
     setStatus(error.message || "Share failed.", true);
   } finally {
@@ -635,4 +740,5 @@ shareBtn.addEventListener("click", async () => {
   setAuthRequiredUi(false);
   await loadRecruitersFromStorage();
   await fetchChannels();
+  startChannelsAutoRefresh();
 })();

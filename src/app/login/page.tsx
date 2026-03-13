@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import type { FirebaseError } from "firebase/app";
 import { loginWithEmail, sendPasswordReset } from "@/lib/auth";
 
@@ -31,14 +31,18 @@ function getAuthErrorMessage(error: unknown) {
 
 export default function LoginPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const nextUrl = searchParams.get("next") || "/dashboard";
+  const [nextUrl, setNextUrl] = useState("/dashboard");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
   const [resetMessage, setResetMessage] = useState("");
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setNextUrl(params.get("next") || "/dashboard");
+  }, []);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -79,7 +83,14 @@ export default function LoginPage() {
         window as Window & {
           chrome?: {
             storage?: {
-              local?: { set: (payload: { authToken: string; backendUrl: string }) => void };
+              local?: {
+                set: (payload: {
+                  authToken: string;
+                  backendUrl: string;
+                  userId?: string;
+                  currentUserId?: string;
+                }) => void;
+              };
               sync?: { set: (payload: { authToken: string }) => void };
             };
           };

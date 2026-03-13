@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import type { FirebaseError } from "firebase/app";
 import { signUpWithEmail } from "@/lib/auth";
 
@@ -40,14 +40,18 @@ function getAuthErrorMessage(error: unknown) {
 
 export default function SignupPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const nextUrl = searchParams.get("next") || "/dashboard";
+  const [nextUrl, setNextUrl] = useState("/dashboard");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setNextUrl(params.get("next") || "/dashboard");
+  }, []);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();

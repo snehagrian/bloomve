@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { User } from "firebase/auth";
 import { subscribeToAuthState } from "@/lib/auth";
 
@@ -12,7 +12,6 @@ type AuthGuardProps = {
 export default function AuthGuard({ children }: AuthGuardProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
 
@@ -22,14 +21,14 @@ export default function AuthGuard({ children }: AuthGuardProps) {
       setLoading(false);
 
       if (!nextUser) {
-        const queryString = searchParams?.toString();
-        const destination = `${pathname}${queryString ? `?${queryString}` : ""}`;
+        const queryString = typeof window !== "undefined" ? window.location.search : "";
+        const destination = `${pathname}${queryString}`;
         router.replace(`/login?next=${encodeURIComponent(destination)}`);
       }
     });
 
     return unsubscribe;
-  }, [pathname, router, searchParams]);
+  }, [pathname, router]);
 
   if (loading) {
     return (

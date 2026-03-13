@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import type { User } from "firebase/auth";
 import type { FirestoreError } from "firebase/firestore";
 import AuthGuard from "@/components/AuthGuard";
@@ -38,9 +38,12 @@ function prettyDate(ms?: number) {
 export default function RoomPage() {
   const params = useParams<{ roomId: string }>();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const roomId = params?.roomId;
-  const inviteToken = searchParams.get("invite")?.trim() || "";
+  const [inviteToken] = useState(() => {
+    if (typeof window === "undefined") return "";
+    const queryParams = new URLSearchParams(window.location.search);
+    return queryParams.get("invite")?.trim() || "";
+  });
 
   const [user, setUser] = useState<User | null>(null);
   const [room, setRoom] = useState<Room | null>(null);
@@ -177,6 +180,18 @@ export default function RoomPage() {
     }
 
     return "Unknown user";
+  };
+
+  const getParticipantInitials = (participantId: string) => {
+    const label = getParticipantLabel(participantId);
+    const parts = label
+      .split(/\s+/)
+      .map((value) => value.trim())
+      .filter(Boolean)
+      .slice(0, 2);
+
+    if (parts.length === 0) return "BV";
+    return parts.map((value) => value[0]?.toUpperCase() ?? "").join("") || "BV";
   };
 
   const roomAvatarElement = (
@@ -676,25 +691,68 @@ export default function RoomPage() {
                       <p className="mt-1 text-xs text-slate-300">Share the first opportunity and help this room bloom.</p>
                     </div>
                   ) : (
-                    posts.map((post) => (
-                      <article key={post.id} className="card card-3d group p-5 transition-all">
-                        <div className="flex items-start justify-between gap-4">
-                          <h3 className="font-semibold text-slate-900 leading-snug">{post.title || "Shared job link"}</h3>
-                          <span className="shrink-0 text-xs text-slate-300">{prettyDate(post.createdAt?.toMillis())}</span>
-                        </div>
+                    posts.map((post) => {
+                      const isOwnPost = post.userId === user?.uid;
+                      const senderName = getParticipantLabel(post.userId);
+                      const senderInitials = getParticipantInitials(post.userId);
+                      const showTitle = !!post.title && post.title.trim() && post.title !== "Shared job link";
+                      const showText = !!post.text && post.text.trim() && post.text.trim() !== post.jobUrl.trim();
 
-                        {post.text && <p className="mt-2 text-sm leading-relaxed text-slate-500">{post.text}</p>}
-
-                        <a
-                          href={post.jobUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-rose-500 hover:text-rose-600 transition-colors"
+                      return (
+                        <article
+                          key={post.id}
+                          className={`flex items-end gap-3 ${isOwnPost ? "justify-end" : "justify-start"}`}
                         >
-                          View posting <span className="group-hover:translate-x-0.5 transition-transform inline-block">→</span>
-                        </a>
-                      </article>
-                    ))
+                          {!isOwnPost && (
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-rose-200 via-pink-200 to-fuchsia-200 text-xs font-bold text-rose-700 shadow-sm">
+                              {senderInitials}
+                            </div>
+                          )}
+
+                          <div className={`max-w-[85%] ${isOwnPost ? "items-end" : "items-start"} flex flex-col`}>
+                            <div className={`mb-1 flex items-center gap-2 px-1 ${isOwnPost ? "flex-row-reverse" : ""}`}>
+                              <span className="text-xs font-semibold text-slate-500">{isOwnPost ? "You" : senderName}</span>
+                              <span className="text-[11px] text-slate-300">{prettyDate(post.createdAt?.toMillis())}</span>
+                            </div>
+
+                            <div
+                              className={`rounded-3xl px-4 py-3 shadow-sm ${
+                                isOwnPost
+                                  ? "rounded-br-md bg-gradient-to-br from-rose-500 via-pink-500 to-fuchsia-500 text-white"
+                                  : "rounded-bl-md border border-rose-100 bg-white text-slate-700"
+                              }`}
+                            >
+                              {showTitle && (
+                                <p className={`text-sm font-semibold ${isOwnPost ? "text-white" : "text-slate-900"}`}>{post.title}</p>
+                              )}
+
+                              {showText && (
+                                <p className={`text-sm leading-relaxed ${showTitle ? "mt-1.5" : ""} ${isOwnPost ? "text-white/95" : "text-slate-600"}`}>
+                                  {post.text}
+                                </p>
+                              )}
+
+                              <a
+                                href={post.jobUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={`mt-2 block break-all text-sm underline-offset-2 hover:underline ${
+                                  isOwnPost ? "text-white" : "text-rose-500"
+                                }`}
+                              >
+                                {post.jobUrl}
+                              </a>
+                            </div>
+                          </div>
+
+                          {isOwnPost && (
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-rose-500 via-pink-500 to-fuchsia-500 text-xs font-bold text-white shadow-sm">
+                              {senderInitials}
+                            </div>
+                          )}
+                        </article>
+                      );
+                    })
                   )}
                 </section>
               </div>

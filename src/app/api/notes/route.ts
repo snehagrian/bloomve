@@ -1,7 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cert, getApps, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import * as cheerio from "cheerio";
+
+function isAllowedOrigin(origin: string, extensionId?: string) {
+  if (!origin) return false;
+
+  if (extensionId && origin === `chrome-extension://${extensionId}`) {
+    return true;
+  }
+
+  return [
+    /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i,
+    /^https:\/\/([\w-]+\.)?(bloomve|bloomvey)\.app$/i,
+    /^https:\/\/([\w-]+\.)?linkedin\.com$/i,
+    /^https:\/\/([\w-]+\.)?indeed\.com$/i,
+    /^https:\/\/([\w-]+\.)?myworkdayjobs\.com$/i,
+    /^https:\/\/([\w-]+\.)?greenhouse\.io$/i,
+  ].some((pattern) => pattern.test(origin));
+}
 
 type NotesPayload = {
   userId?: string;
@@ -13,12 +31,17 @@ type NotesPayload = {
   url?: string;
 };
 
-function getCorsHeaders() {
-  const extensionId = process.env.BLOOMVEY_EXTENSION_ID || "YOUR_EXTENSION_ID";
+function getCorsHeaders(request?: NextRequest) {
+  const origin = request?.headers.get("origin") || "";
+  const extensionId = process.env.BLOOMVEY_EXTENSION_ID;
+  const allowedOrigin = isAllowedOrigin(origin, extensionId) ? origin : "";
+
   return {
-    "Access-Control-Allow-Origin": `chrome-extension://${extensionId}`,
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Allow-Credentials": "true",
+    "Vary": "Origin",
   };
 }
 
@@ -42,6 +65,43 @@ function getAdminDb() {
   }
 
   return getFirestore();
+}
+
+function getAdminAuth() {
+  if (!getApps().length) {
+    const projectId = process.env.FIREBASE_PROJECT_ID;
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+    const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
+
+    if (!projectId || !clientEmail || !privateKey) {
+      throw new Error("Missing Firebase Admin environment variables.");
+    }
+
+    initializeApp({
+      credential: cert({
+        projectId,
+        clientEmail,
+        privateKey,
+      }),
+    });
+  }
+
+  return getAuth();
+}
+
+async function getAuthorizedUserId(request: NextRequest) {
+  const authorization = request.headers.get("authorization") || "";
+  if (!authorization.toLowerCase().startsWith("bearer ")) {
+    return "";
+  }
+
+  const idToken = authorization.replace(/^Bearer\s+/i, "").trim();
+  if (!idToken) {
+    return "";
+  }
+
+  const decoded = await getAdminAuth().verifyIdToken(idToken);
+  return decoded.uid || "";
 }
 
 function isValidUrl(input: string) {
@@ -140,17 +200,58 @@ async function scrapeJobData(url: string) {
   };
 }
 
-export async function OPTIONS() {
-  const corsHeaders = getCorsHeaders();
+export async function OPTIONS(request: NextRequest) {
+  const corsHeaders = getCorsHeaders(request);
   return NextResponse.json({ ok: true }, { headers: corsHeaders });
 }
 
-export async function POST(request: NextRequest) {
-  const corsHeaders = getCorsHeaders();
+export async function GET(request: NextRequest) {
+  const corsHeaders = getCorsHeaders(request);
   try {
+    const userId = await getAuthorizedUserId(request);
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders });
+    }
+
+    const db = getAdminDb();
+    const snapshot = await db
+      .collection("notes")
+      .where("userId", "==", userId)
+      .orderBy("dateAdded", "desc")
+      .get();
+
+    const notes = snapshot.docs.map((noteDoc) => {
+      const note = noteDoc.data();
+      return {
+        id: noteDoc.id,
+        userId,
+        title: note.jobTitle || note.title || "Untitled job",
+        jobTitle: note.jobTitle || note.title || "Untitled job",
+        company: note.company || "Unknown company",
+        location: note.location || "",
+        salary: note.salary || "",
+        url: note.url || "",
+        recruiters: Array.isArray(note.recruiters) ? note.recruiters : [],
+      };
+    });
+
+    return NextResponse.json({ notes, items: notes }, { headers: corsHeaders });
+  } catch (error) {
+    console.error("GET /api/notes error:", error);
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders });
+  }
+}
+
+export async function POST(request: NextRequest) {
+  const corsHeaders = getCorsHeaders(request);
+  try {
+    const authedUserId = await getAuthorizedUserId(request);
+    if (!authedUserId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders });
+    }
+
     const body = (await request.json()) as NotesPayload;
 
-    const userId = String(body.userId ?? "").trim();
     const inputUrl = String(body.url ?? "").trim();
     const inputTitle = String(body.title ?? body.jobTitle ?? "").trim();
     const inputCompany = String(body.company ?? "").trim();
@@ -179,7 +280,7 @@ export async function POST(request: NextRequest) {
 
     const db = getAdminDb();
     const nowIso = new Date().toISOString();
-    const persistedUserId = userId || "unknown";
+    const persistedUserId = authedUserId;
 
     const docRef = await db.collection("notes").add({
       userId: persistedUserId,

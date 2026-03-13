@@ -3,12 +3,34 @@ import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 
-function getCorsHeaders() {
-  const extensionId = process.env.BLOOMVEY_EXTENSION_ID || "YOUR_EXTENSION_ID";
+function isAllowedOrigin(origin: string, extensionId?: string) {
+  if (!origin) return false;
+
+  if (extensionId && origin === `chrome-extension://${extensionId}`) {
+    return true;
+  }
+
+  return [
+    /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i,
+    /^https:\/\/([\w-]+\.)?(bloomve|bloomvey)\.app$/i,
+    /^https:\/\/([\w-]+\.)?linkedin\.com$/i,
+    /^https:\/\/([\w-]+\.)?indeed\.com$/i,
+    /^https:\/\/([\w-]+\.)?myworkdayjobs\.com$/i,
+    /^https:\/\/([\w-]+\.)?greenhouse\.io$/i,
+  ].some((pattern) => pattern.test(origin));
+}
+
+function getCorsHeaders(request?: NextRequest) {
+  const origin = request?.headers.get("origin") || "";
+  const extensionId = process.env.BLOOMVEY_EXTENSION_ID;
+  const allowedOrigin = isAllowedOrigin(origin, extensionId) ? origin : "";
+
   return {
-    "Access-Control-Allow-Origin": `chrome-extension://${extensionId}`,
+    "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Methods": "GET, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Bloomve-User-Id",
+    "Access-Control-Allow-Credentials": "true",
+    "Vary": "Origin",
   };
 }
 
@@ -34,13 +56,35 @@ function getAdminDb() {
   return getFirestore();
 }
 
-export async function OPTIONS() {
-  const corsHeaders = getCorsHeaders();
+function getAdminAuth() {
+  if (!getApps().length) {
+    const projectId = process.env.FIREBASE_PROJECT_ID;
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+    const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
+
+    if (!projectId || !clientEmail || !privateKey) {
+      throw new Error("Missing Firebase Admin environment variables.");
+    }
+
+    initializeApp({
+      credential: cert({
+        projectId,
+        clientEmail,
+        privateKey,
+      }),
+    });
+  }
+
+  return getAuth();
+}
+
+export async function OPTIONS(request: NextRequest) {
+  const corsHeaders = getCorsHeaders(request);
   return NextResponse.json({ ok: true }, { headers: corsHeaders });
 }
 
 export async function GET(request: NextRequest) {
-  const corsHeaders = getCorsHeaders();
+  const corsHeaders = getCorsHeaders(request);
 
   try {
     const authorization = request.headers.get("authorization") || "";
@@ -53,13 +97,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders });
     }
 
-    let userId = "";
-    try {
-      const decoded = await getAuth().verifyIdToken(idToken);
-      userId = decoded.uid || "";
-    } catch {
-      userId = request.headers.get("x-bloomve-user-id")?.trim() || "";
-    }
+    const decoded = await getAdminAuth().verifyIdToken(idToken);
+    const userId = decoded.uid || "";
 
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders });
@@ -85,10 +124,7 @@ export async function GET(request: NextRequest) {
 
     const items = Array.from(merged.values());
 
-    const channels = items.filter((item) => (item.type || "").toLowerCase() === "channel");
-    const chats = items.filter((item) => (item.type || "").toLowerCase() === "chat");
-
-    return NextResponse.json({ channels, chats, items }, { headers: corsHeaders });
+    return NextResponse.json({ items }, { headers: corsHeaders });
   } catch (error) {
     console.error("GET /api/channels error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500, headers: corsHeaders });

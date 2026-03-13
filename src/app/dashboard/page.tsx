@@ -55,7 +55,9 @@ export default function DashboardPage() {
     privacy: RoomPrivacy;
     friendIds: string[];
   }) => {
-    if (!user) return;
+    if (!user) {
+      throw new Error("You must be signed in to create a room.");
+    }
 
     return createRoom({
       ...input,
