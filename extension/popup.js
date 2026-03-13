@@ -284,80 +284,52 @@ function renderRoomSelection(items) {
 
     const row = document.createElement("label");
     row.className = "room-selection-item";
+    row.dataset.roomId = roomId;
+    row.dataset.channelName = room.name || room.title || "Untitled";
+    row.dataset.channelKind = room.kind || room.type || "channel";
 
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.className = "room-selection-checkbox";
-    checkbox.value = roomId;
-    checkbox.dataset.channelName = room.name || room.title || "Untitled";
-    checkbox.dataset.channelKind = room.kind || room.type || "channel";
-    checkbox.style.position = "absolute";
-    checkbox.style.opacity = "0";
-    checkbox.style.pointerEvents = "none";
+    const visBox = document.createElement("span");
+    visBox.className = "room-selection-box";
 
-    const roundCheck = document.createElement("span");
-    roundCheck.className = "room-selection-round-check";
-    roundCheck.setAttribute("aria-hidden", "true");
-    roundCheck.style.width = "18px";
-    roundCheck.style.height = "18px";
-    roundCheck.style.minWidth = "18px";
-    roundCheck.style.borderRadius = "999px";
-    roundCheck.style.border = "1.5px solid #374151";
-    roundCheck.style.background = "#ffffff";
-    roundCheck.style.display = "inline-flex";
-    roundCheck.style.alignItems = "center";
-    roundCheck.style.justifyContent = "center";
-    roundCheck.style.color = "#ffffff";
-    roundCheck.style.fontSize = "11px";
-    roundCheck.style.fontWeight = "700";
-    roundCheck.style.lineHeight = "1";
-    roundCheck.style.flex = "0 0 auto";
-    roundCheck.style.transition = "all 120ms ease";
+    const setBoxState = (isChecked) => {
+      row.classList.toggle("is-selected", isChecked);
+      row.style.background = isChecked ? "#ecfdf5" : "";
+      visBox.style.borderColor = isChecked ? "#16a34a" : "#9ca3af";
+      visBox.style.background = isChecked ? "#16a34a" : "#ffffff";
+      visBox.textContent = isChecked ? "\u2713" : "";
+    };
+
+    let checked = false;
+    setBoxState(false);
+
+    row.addEventListener("click", () => {
+      checked = !checked;
+      setBoxState(checked);
+    });
 
     const labelContent = document.createElement("span");
     labelContent.className = "room-selection-label";
 
     const name = document.createElement("span");
     name.className = "room-selection-name";
-    name.textContent = checkbox.dataset.channelName;
+    name.textContent = row.dataset.channelName;
 
     const kind = document.createElement("span");
     kind.className = "room-selection-kind";
-    kind.textContent = checkbox.dataset.channelKind;
+    kind.textContent = row.dataset.channelKind;
 
     labelContent.appendChild(name);
     labelContent.appendChild(kind);
-
-    const syncSelectedState = () => {
-      const isSelected = checkbox.checked;
-      row.classList.toggle("is-selected", isSelected);
-      row.style.background = isSelected ? "#ecfdf5" : "";
-
-      if (isSelected) {
-        roundCheck.style.borderColor = "#16a34a";
-        roundCheck.style.background = "#16a34a";
-        roundCheck.textContent = "✓";
-      } else {
-        roundCheck.style.borderColor = "#374151";
-        roundCheck.style.background = "#ffffff";
-        roundCheck.textContent = "";
-      }
-    };
-
-    checkbox.addEventListener("change", syncSelectedState);
-
-    row.appendChild(checkbox);
-    row.appendChild(roundCheck);
+    row.appendChild(visBox);
     row.appendChild(labelContent);
     roomSelectionList.appendChild(row);
-    syncSelectedState();
   });
 }
 
 function getSelectedRooms() {
-  return Array.from(roomSelectionList.querySelectorAll('input[type="checkbox"]:checked')).map((input) => ({
-    id: input.value,
-    name: input.dataset.channelName || "Channel",
+  return Array.from(roomSelectionList.querySelectorAll("label.room-selection-item.is-selected")).map((label) => ({
+    id: label.dataset.roomId || "",
+    name: label.dataset.channelName || "Channel",
   }));
 }
 

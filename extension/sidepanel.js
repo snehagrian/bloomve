@@ -7,7 +7,7 @@ const currentUrlEl = document.getElementById("currentUrl");
 const unsupportedEl = document.getElementById("unsupported");
 
 let activeTabUrl = "";
-let selectedChatId = "";
+let selectedChatIds = new Set();
 let chats = [];
 let apiBaseUrl = "http://localhost:3000";
 
@@ -270,9 +270,19 @@ function renderChats() {
     const chatId = chat.id || chat.channelId;
     if (!chatId) return;
 
+    const isSelected = selectedChatIds.has(chatId);
     const item = document.createElement("li");
-    item.className = `chat-item${selectedChatId === chatId ? " active" : ""}`;
+    item.className = `chat-item${isSelected ? " active" : ""}`;
     item.dataset.chatId = chatId;
+
+    const visBox = document.createElement("span");
+    visBox.className = "chat-item-checkbox";
+    visBox.style.borderColor = isSelected ? "#4f46e5" : "#9ca3af";
+    visBox.style.background = isSelected ? "#4f46e5" : "#ffffff";
+    visBox.textContent = isSelected ? "\u2713" : "";
+
+    const content = document.createElement("div");
+    content.className = "chat-item-content";
 
     const name = document.createElement("p");
     name.className = "chat-name";
@@ -282,16 +292,39 @@ function renderChats() {
     meta.className = "chat-meta";
     meta.textContent = "Chat";
 
-    item.appendChild(name);
-    item.appendChild(meta);
+    content.appendChild(name);
+    content.appendChild(meta);
 
-    item.addEventListener("click", () => {
-      selectedChatId = chatId;
+    item.appendChild(visBox);
+    item.appendChild(content);
+
+    const toggleSelection = () => {
+      if (selectedChatIds.has(chatId)) {
+        selectedChatIds.delete(chatId);
+      } else {
+        selectedChatIds.add(chatId);
+      }
+
       renderChats();
-      setStatus(`Selected ${name.textContent}`);
-    });
+      const selectedCount = selectedChatIds.size;
+      if (selectedCount === 0) {
+        setStatus("No chat selected.");
+        return;
+      }
+
+      setStatus(`Selected ${selectedCount} chat(s).`);
+    };
+
+    item.addEventListener("click", toggleSelection);
 
     chatListEl.appendChild(item);
+  });
+}
+
+function getSelectedChats() {
+  return chats.filter((item) => {
+    const id = item.id || item.channelId;
+    return !!id && selectedChatIds.has(id);
   });
 }
 
@@ -333,8 +366,21 @@ async function fetchChats() {
       chats = allItems;
     }
 
-    if (!selectedChatId && chats.length > 0) {
-      selectedChatId = chats[0].id || chats[0].channelId || "";
+    if (!selectedChatIds.size && chats.length > 0) {
+      const firstChatId = chats[0].id || chats[0].channelId || "";
+      if (firstChatId) {
+        selectedChatIds = new Set([firstChatId]);
+      }
+    }
+
+    const validChatIds = new Set(chats.map((item) => item.id || item.channelId).filter(Boolean));
+    selectedChatIds = new Set(Array.from(selectedChatIds).filter((id) => validChatIds.has(id)));
+
+    if (!selectedChatIds.size && chats.length > 0) {
+      const firstChatId = chats[0].id || chats[0].channelId || "";
+      if (firstChatId) {
+        selectedChatIds = new Set([firstChatId]);
+      }
     }
 
     renderChats();
@@ -414,9 +460,10 @@ async function saveJob() {
 async function shareJob() {
   const auth = await readAuthFromStorage();
   const authToken = getAuthTokenFromStorage(auth);
+  const selectedChats = getSelectedChats();
 
-  if (!apiBaseUrl || !authToken || !selectedChatId) {
-    setStatus("Please log in to Bloomvey and select a chat.", true);
+  if (!apiBaseUrl || !authToken || selectedChats.length === 0) {
+    setStatus("Please log in to Bloomvey and select at least one chat.", true);
     return;
   }
 
@@ -434,24 +481,41 @@ async function shareJob() {
     setStatus("Sharing...");
     shareBtn.disabled = true;
 
-    const chat = chats.find((item) => (item.id || item.channelId) === selectedChatId);
-    const chatName = chat?.name || chat?.title || "Chat";
+    const shareResults = await Promise.allSettled(
+      selectedChats.map(async (chat) => {
+        const chatId = chat.id || chat.channelId;
+        const chatName = chat?.name || chat?.title || "Chat";
 
-    const response = await fetch(`${apiBaseUrl}/api/channels/${encodeURIComponent(selectedChatId)}/messages`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${authToken}`,
-      },
-      body: JSON.stringify({ message: activeTabUrl }),
-    });
+        const response = await fetch(`${apiBaseUrl}/api/channels/${encodeURIComponent(chatId)}/messages`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${authToken}`,
+          },
+          body: JSON.stringify({ message: activeTabUrl }),
+        });
 
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data?.error || "Share failed.");
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data?.error || `Share failed for ${chatName}.`);
+        }
+
+        return chatName;
+      })
+    );
+
+    const fulfilled = shareResults.filter((result) => result.status === "fulfilled");
+    const rejected = shareResults.filter((result) => result.status === "rejected");
+
+    if (!fulfilled.length) {
+      throw new Error(rejected[0]?.reason?.message || "Share failed.");
     }
 
-    setStatus(`Shared to ${chatName} ✓`);
+    if (rejected.length) {
+      setStatus(`Shared to ${fulfilled.length} chat(s), ${rejected.length} failed.`, true);
+    } else {
+      setStatus(`Shared to ${fulfilled.length} chat(s) ✓`);
+    }
   } catch (error) {
     setStatus(error.message || "Share failed.", true);
   } finally {

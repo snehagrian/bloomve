@@ -6,7 +6,8 @@
   const STORAGE_KEY = "bloomveCurrentJob";
 
   let activeUrl = window.location.href;
-  let selectedRoomId = "";
+  let selectedRoomIds = new Set();
+  let availableRooms = [];
 
   function noop() {}
 
@@ -251,6 +252,13 @@
     statusEl.style.color = isError ? "#dc2626" : "#6b7280";
   }
 
+  function getSelectedRooms() {
+    return availableRooms.filter((room) => {
+      const roomId = room.id || room.channelId;
+      return !!roomId && selectedRoomIds.has(roomId);
+    });
+  }
+
   function getCurrentJobUrl() {
     return window.location.href || activeUrl;
   }
@@ -300,6 +308,7 @@
       }
 
       const rooms = normalizeRoomItems(data);
+      availableRooms = rooms;
       listEl.innerHTML = "";
 
       if (!rooms.length) {
@@ -317,13 +326,43 @@
         const roomId = room.id || room.channelId;
         if (!roomId) return;
 
+        const isSelected = selectedRoomIds.has(roomId);
+
         const row = document.createElement("li");
         row.className = "bloomve-room-row";
         row.dataset.roomId = roomId;
         row.style.padding = "10px";
+        row.style.display = "flex";
+        row.style.alignItems = "flex-start";
+        row.style.gap = "8px";
         row.style.borderBottom = "1px solid #f3f4f6";
         row.style.cursor = "pointer";
-        row.style.background = selectedRoomId === roomId ? "#eef2ff" : "#ffffff";
+        row.style.background = isSelected ? "#eef2ff" : "#ffffff";
+
+        const checkbox = document.createElement("span");
+        checkbox.style.display = "inline-flex";
+        checkbox.style.alignItems = "center";
+        checkbox.style.justifyContent = "center";
+        checkbox.style.width = "16px";
+        checkbox.style.height = "16px";
+        checkbox.style.minWidth = "16px";
+        checkbox.style.flexShrink = "0";
+        checkbox.style.borderRadius = "4px";
+        checkbox.style.border = isSelected ? "1.5px solid #ec4899" : "1.5px solid #9ca3af";
+        checkbox.style.background = isSelected ? "#ec4899" : "#ffffff";
+        checkbox.style.color = "#ffffff";
+        checkbox.style.fontSize = "10px";
+        checkbox.style.fontWeight = "700";
+        checkbox.style.lineHeight = "1";
+        checkbox.style.margin = "2px 0 0";
+        checkbox.style.userSelect = "none";
+        checkbox.style.transition = "border-color 120ms ease, background 120ms ease";
+        checkbox.style.boxSizing = "border-box";
+        checkbox.textContent = isSelected ? "\u2713" : "";
+
+        const content = document.createElement("div");
+        content.style.minWidth = "0";
+        content.style.flex = "1";
 
         const name = document.createElement("div");
         name.textContent = room.name || room.title || "Untitled";
@@ -336,24 +375,56 @@
         kind.style.fontSize = "11px";
         kind.style.color = "#6b7280";
 
-        row.appendChild(name);
-        row.appendChild(kind);
+        content.appendChild(name);
+        content.appendChild(kind);
 
-        row.addEventListener("click", () => {
-          selectedRoomId = roomId;
-          document.querySelectorAll(".bloomve-room-row").forEach((item) => {
-            item.style.background = item.dataset.roomId === selectedRoomId ? "#eef2ff" : "#ffffff";
-          });
-          setStatus(`Selected ${name.textContent}`);
+        row.appendChild(checkbox);
+        row.appendChild(content);
+
+        const toggleSelection = () => {
+          if (selectedRoomIds.has(roomId)) {
+            selectedRoomIds.delete(roomId);
+          } else {
+            selectedRoomIds.add(roomId);
+          }
+
+          void fetchRooms();
+
+          const selectedCount = selectedRoomIds.size;
+          if (!selectedCount) {
+            setStatus("No chat/channel selected.");
+          } else {
+            setStatus(`Selected ${selectedCount} chats/channels.`);
+          }
+        };
+
+        checkbox.addEventListener("click", (event) => {
+          event.stopPropagation();
+          toggleSelection();
         });
+
+        row.addEventListener("click", toggleSelection);
 
         listEl.appendChild(row);
 
-        if (!selectedRoomId && index === 0) {
-          selectedRoomId = roomId;
+        if (!selectedRoomIds.size && index === 0) {
+          selectedRoomIds = new Set([roomId]);
           row.style.background = "#eef2ff";
+          checkbox.style.border = "1.5px solid #ec4899";
+          checkbox.style.background = "#ec4899";
+          checkbox.textContent = "\u2713";
         }
       });
+
+      const validRoomIds = new Set(rooms.map((room) => room.id || room.channelId).filter(Boolean));
+      selectedRoomIds = new Set(Array.from(selectedRoomIds).filter((roomId) => validRoomIds.has(roomId)));
+
+      if (!selectedRoomIds.size && rooms[0]) {
+        const firstRoomId = rooms[0].id || rooms[0].channelId;
+        if (firstRoomId) {
+          selectedRoomIds = new Set([firstRoomId]);
+        }
+      }
 
       setStatus(`Loaded ${rooms.length} chats/channels.`);
     } catch (error) {
@@ -368,8 +439,10 @@
       return;
     }
 
-    if (!selectedRoomId) {
-      setStatus("Select a chat/channel first.", true);
+    const selectedRooms = getSelectedRooms();
+
+    if (!selectedRooms.length) {
+      setStatus("Select at least one chat/channel first.", true);
       return;
     }
 
@@ -381,18 +454,36 @@
 
     try {
       setStatus("Sharing...");
-      const { response, data } = await fetchJsonAcrossBackends(`/api/channels/${encodeURIComponent(selectedRoomId)}/messages`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${authToken}`,
-        },
-        body: JSON.stringify({ message: getShareMessage() }),
-      });
+      const results = await Promise.allSettled(
+        selectedRooms.map(async (room) => {
+          const roomId = room.id || room.channelId;
+          const roomName = room.name || room.title || "Room";
+          const { response, data } = await fetchJsonAcrossBackends(`/api/channels/${encodeURIComponent(roomId)}/messages`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${authToken}`,
+            },
+            body: JSON.stringify({ message: getShareMessage() }),
+          });
 
-      if (!response.ok) throw new Error(data?.error || "Share failed.");
+          if (!response.ok) throw new Error(data?.error || `Share failed for ${roomName}.`);
+          return roomName;
+        })
+      );
 
-      setStatus("Shared ✓");
+      const successful = results.filter((result) => result.status === "fulfilled");
+      const failed = results.filter((result) => result.status === "rejected");
+
+      if (!successful.length) {
+        throw new Error(failed[0]?.reason?.message || "Share failed.");
+      }
+
+      if (failed.length) {
+        setStatus(`Shared to ${successful.length}, ${failed.length} failed.`, true);
+      } else {
+        setStatus(`Shared to ${successful.length} ✓`);
+      }
     } catch (error) {
       setStatus(error.message || "Share failed.", true);
     }

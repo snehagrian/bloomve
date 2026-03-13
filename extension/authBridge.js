@@ -89,12 +89,25 @@
     if (!hasExtensionContext()) return;
 
     const auth = extractFirebaseAuth();
-    if (!auth?.token) return;
 
     try {
       const localStorageArea = getStorageArea("local");
       const syncStorageArea = getStorageArea("sync");
       if (!localStorageArea || !syncStorageArea) return;
+
+      if (!auth?.token) {
+        await localStorageArea.set({
+          authToken: "",
+          userId: "",
+          currentUserId: "",
+        });
+        await syncStorageArea.set({
+          authToken: "",
+          userId: "",
+          currentUserId: "",
+        });
+        return;
+      }
 
       const backendUrl =
         window.localStorage.getItem("bloomveyBackendUrl") ||
@@ -102,8 +115,7 @@
         window.location.origin;
 
       const linked = await linkTokenWithBackend(auth.token, backendUrl);
-      if (!linked?.userId) return;
-      const resolvedUserId = linked.userId || auth.userId;
+      const resolvedUserId = linked?.userId || auth.userId || "";
 
       await localStorageArea.set({
         authToken: auth.token,
